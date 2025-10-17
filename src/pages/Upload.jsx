@@ -10,8 +10,12 @@ const Upload = () => {
     name: '',
     age: '',
     gender: '',
-    medicalHistory: ''
+    medicalHistory: '',
+    smoking: false,
+    diabetes: false,
+    hypertension: false
   })
+  const [xrayType, setXrayType] = useState('chest')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState(null)
 
@@ -55,30 +59,57 @@ const Upload = () => {
     setIsAnalyzing(true)
     
     try {
-      // Simular análise de IA - na implementação real, isso chamaria a API de IA
-      await new Promise(resolve => setTimeout(resolve, 3000))
+      // Convert image to base64
+      const file = uploadedFiles[0].file
+      const base64 = await fileToBase64(file)
       
-      // Call the real API for analysis
-      const formData = new FormData()
-      uploadedFiles.forEach(fileData => {
-        formData.append('images', fileData.file)
-      })
-      formData.append('patientInfo', JSON.stringify(patientInfo))
-      formData.append('symptoms', symptoms)
+      // Prepare request payload
+      const payload = {
+        image: base64,
+        xrayType: xrayType,
+        patientInfo: {
+          age: parseInt(patientInfo.age) || 0,
+          gender: patientInfo.gender,
+          smoking: patientInfo.smoking,
+          diabetes: patientInfo.diabetes,
+          hypertension: patientInfo.hypertension,
+          medicalHistory: patientInfo.medicalHistory,
+          symptoms: symptoms
+        }
+      }
 
-      const response = await fetch('/api/analyze', {
+      // Call the MONAI API
+      const response = await fetch('/api/analyze-xray', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
       })
 
       if (!response.ok) {
-        throw new Error('Erro na análise da imagem')
+        throw new Error(`Erro na análise: ${response.status}`)
       }
 
       const result = await response.json()
-      const mockResult = result.data
       
-      setAnalysisResult(mockResult)
+      // Transform MONAI result to frontend format
+      const transformedResult = {
+        findings: result.findings.map((finding, index) => ({
+          condition: `Achado ${index + 1}`,
+          description: finding,
+          severity: 'normal',
+          confidence: Math.round(result.confidence * 100)
+        })),
+        recommendations: result.recommendations,
+        riskFactors: result.riskFactors,
+        confidence: Math.round(result.confidence * 100),
+        aiProvider: result.framework || 'MONAI',
+        xrayType: result.xrayType,
+        timestamp: result.timestamp
+      }
+      
+      setAnalysisResult(transformedResult)
       toast.success('Análise concluída com sucesso!')
     } catch (error) {
       toast.error('Análise falhou. Tente novamente.')
@@ -88,6 +119,16 @@ const Upload = () => {
     }
   }
 
+  // Helper function to convert file to base64
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = error => reject(error)
+    })
+  }
+
   const resetForm = () => {
     setUploadedFiles([])
     setSymptoms('')
@@ -95,8 +136,12 @@ const Upload = () => {
       name: '',
       age: '',
       gender: '',
-      medicalHistory: ''
+      medicalHistory: '',
+      smoking: false,
+      diabetes: false,
+      hypertension: false
     })
+    setXrayType('chest')
     setAnalysisResult(null)
   }
 
@@ -188,6 +233,28 @@ const Upload = () => {
             )}
           </div>
 
+          {/* Tipo de Raio-X */}
+          <div className="card">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Tipo de Raio-X
+            </h2>
+            <select
+              value={xrayType}
+              onChange={(e) => setXrayType(e.target.value)}
+              className="input-field"
+            >
+              <option value="chest">Tórax</option>
+              <option value="bone">Ossos/Articulações</option>
+              <option value="dental">Dental</option>
+              <option value="spine">Coluna</option>
+              <option value="skull">Crânio</option>
+              <option value="abdomen">Abdômen</option>
+              <option value="pelvis">Pelve</option>
+              <option value="extremities">Extremidades</option>
+              <option value="general">Geral</option>
+            </select>
+          </div>
+
           {/* Informações do Paciente */}
           <div className="card">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -240,6 +307,40 @@ const Upload = () => {
                   className="input-field"
                   placeholder="Condições prévias, medicamentos, etc."
                 />
+              </div>
+            </div>
+
+            {/* Fatores de Risco */}
+            <div className="mt-4">
+              <h3 className="text-md font-medium text-gray-900 mb-3">Fatores de Risco:</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={patientInfo.smoking}
+                    onChange={(e) => setPatientInfo(prev => ({ ...prev, smoking: e.target.checked }))}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-sm text-gray-700">Tabagismo</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={patientInfo.diabetes}
+                    onChange={(e) => setPatientInfo(prev => ({ ...prev, diabetes: e.target.checked }))}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-sm text-gray-700">Diabetes</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={patientInfo.hypertension}
+                    onChange={(e) => setPatientInfo(prev => ({ ...prev, hypertension: e.target.checked }))}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-sm text-gray-700">Hipertensão</span>
+                </label>
               </div>
             </div>
           </div>
