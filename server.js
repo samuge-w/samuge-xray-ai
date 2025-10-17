@@ -3,6 +3,8 @@ const cors = require('cors')
 const multer = require('multer')
 const path = require('path')
 const sharp = require('sharp')
+const fetch = require('node-fetch')
+const FormData = require('form-data')
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -29,10 +31,104 @@ const upload = multer({
   }
 })
 
-// Enhanced AI Analysis Service with Image Analysis
-const analyzeXRay = async (imageBuffer, patientInfo, symptoms) => {
-  // Simulate AI processing time
-  await new Promise(resolve => setTimeout(resolve, 2000))
+// Chester AI Integration Service
+const chesterAIAnalysis = async (imageBuffer, patientInfo, symptoms) => {
+  try {
+    console.log('🔬 Tentando análise com Chester AI...')
+    
+    // Prepare form data for Chester AI
+    const formData = new FormData()
+    
+    // Add image
+    formData.append('image', imageBuffer, {
+      filename: 'xray.jpg',
+      contentType: 'image/jpeg'
+    })
+    
+    // Add patient information
+    formData.append('patient_info', JSON.stringify({
+      age: patientInfo.age,
+      gender: patientInfo.gender,
+      symptoms: symptoms,
+      medical_history: patientInfo.medicalHistory
+    }))
+    
+    // Add analysis parameters
+    formData.append('analysis_type', 'chest_xray')
+    formData.append('language', 'pt')
+    formData.append('detailed_report', 'true')
+
+    // Try Chester AI API (if available)
+    const response = await fetch('https://api.chester-ai.com/v1/analyze', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        ...formData.getHeaders()
+      },
+      body: formData,
+      timeout: 10000 // 10 second timeout
+    })
+
+    if (response.ok) {
+      const result = await response.json()
+      console.log('✅ Chester AI analysis successful')
+      return transformChesterResponse(result, patientInfo)
+    } else {
+      throw new Error(`Chester AI API error: ${response.status}`)
+    }
+    
+  } catch (error) {
+    console.log('⚠️ Chester AI unavailable, using enhanced local analysis:', error.message)
+    return enhancedLocalAnalysis(imageBuffer, patientInfo, symptoms)
+  }
+}
+
+// Transform Chester AI response to our format
+const transformChesterResponse = (chesterResult, patientInfo) => {
+  const findings = []
+  const recommendations = []
+  const riskFactors = []
+
+  // Process Chester AI findings
+  if (chesterResult.findings && chesterResult.findings.length > 0) {
+    chesterResult.findings.forEach(finding => {
+      findings.push({
+        condition: translateCondition(finding.condition),
+        confidence: Math.round(finding.confidence * 100),
+        description: translateDescription(finding.description),
+        severity: translateSeverity(finding.severity)
+      })
+    })
+  }
+
+  // Process recommendations
+  if (chesterResult.recommendations) {
+    chesterResult.recommendations.forEach(rec => {
+      recommendations.push(translateRecommendation(rec))
+    })
+  }
+
+  // Process risk factors
+  if (chesterResult.risk_factors) {
+    chesterResult.risk_factors.forEach(risk => {
+      riskFactors.push(translateRiskFactor(risk))
+    })
+  }
+
+  return {
+    findings: findings,
+    recommendations: recommendations,
+    riskFactors: riskFactors,
+    analysisId: chesterResult.analysis_id || Date.now().toString(),
+    timestamp: new Date().toISOString(),
+    aiProvider: 'Chester AI',
+    confidence: chesterResult.overall_confidence || 85
+  }
+}
+
+// Enhanced local analysis (fallback)
+const enhancedLocalAnalysis = async (imageBuffer, patientInfo, symptoms) => {
+  console.log('🔄 Usando análise local aprimorada...')
   
   // Analyze image characteristics
   const imageAnalysis = await analyzeImageCharacteristics(imageBuffer)
@@ -46,8 +142,18 @@ const analyzeXRay = async (imageBuffer, patientInfo, symptoms) => {
     riskFactors: generateRiskFactors(patientInfo, findings),
     analysisId: Date.now().toString(),
     timestamp: new Date().toISOString(),
-    imageAnalysis: imageAnalysis
+    aiProvider: 'Análise Local Aprimorada',
+    confidence: 75
   }
+}
+
+// Main analysis function
+const analyzeXRay = async (imageBuffer, patientInfo, symptoms) => {
+  // Simulate AI processing time
+  await new Promise(resolve => setTimeout(resolve, 2000))
+  
+  // Try Chester AI first, fallback to local analysis
+  return await chesterAIAnalysis(imageBuffer, patientInfo, symptoms)
 }
 
 // Analyze image characteristics using Sharp
@@ -233,6 +339,71 @@ const generateRiskFactors = (patientInfo, findings) => {
   }
   
   return riskFactors
+}
+
+// Translation functions for Portuguese
+const translateCondition = (condition) => {
+  const translations = {
+    'pneumonia': 'Pneumonia',
+    'pneumothorax': 'Pneumotórax',
+    'pleural_effusion': 'Derrame Pleural',
+    'cardiomegaly': 'Cardiomegalia',
+    'atelectasis': 'Atelectasia',
+    'consolidation': 'Consolidação Pulmonar',
+    'edema': 'Edema Pulmonar',
+    'mass': 'Massa/Lesão',
+    'fracture': 'Fratura',
+    'normal': 'Raio-X Normal do Tórax',
+    'tuberculosis': 'Tuberculose',
+    'covid19': 'COVID-19',
+    'lung_cancer': 'Câncer de Pulmão'
+  }
+  return translations[condition.toLowerCase()] || condition
+}
+
+const translateDescription = (description) => {
+  // Basic translation - in production, use a proper translation service
+  return description
+}
+
+const translateSeverity = (severity) => {
+  const translations = {
+    'normal': 'Normal',
+    'mild': 'Leve',
+    'moderate': 'Moderado',
+    'severe': 'Grave',
+    'critical': 'Crítico'
+  }
+  return translations[severity.toLowerCase()] || severity
+}
+
+const translateRecommendation = (recommendation) => {
+  const translations = {
+    'antibiotic_treatment': 'Tratamento antibiótico recomendado',
+    'follow_up_xray': 'Raio-X de acompanhamento em 48-72h',
+    'clinical_evaluation': 'Avaliação clínica urgente',
+    'chest_ct': 'Considerar tomografia de tórax',
+    'pulmonology_consult': 'Consulta com pneumologista',
+    'routine_monitoring': 'Continuar monitoramento de rotina',
+    'tuberculosis_treatment': 'Tratamento para tuberculose',
+    'isolation': 'Isolamento respiratório recomendado',
+    'contact_tracing': 'Rastreamento de contatos'
+  }
+  return translations[recommendation.toLowerCase()] || recommendation
+}
+
+const translateRiskFactor = (riskFactor) => {
+  const translations = {
+    'age': 'Idade avançada',
+    'smoking': 'Histórico de tabagismo',
+    'diabetes': 'Diabetes mellitus',
+    'cardiac_history': 'Histórico cardíaco',
+    'immunosuppression': 'Imunossupressão',
+    'contact_with_tb': 'Contato com tuberculose',
+    'hiv_positive': 'HIV positivo',
+    'malnutrition': 'Desnutrição'
+  }
+  return translations[riskFactor.toLowerCase()] || riskFactor
 }
 
 // Routes

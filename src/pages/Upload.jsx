@@ -341,6 +341,23 @@ const Upload = () => {
                   </ul>
                 </div>
               )}
+
+              {/* AI Provider Info */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Brain className="w-4 h-4 text-medical-600" />
+                    <span className="text-sm text-gray-600">
+                      Análise realizada por: <strong>{analysisResult.aiProvider || 'Sistema Local'}</strong>
+                    </span>
+                  </div>
+                  {analysisResult.confidence && (
+                    <span className="text-sm text-gray-500">
+                      Confiança geral: {analysisResult.confidence}%
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="card">

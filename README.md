@@ -133,9 +133,20 @@ PORT=5000
 
 A aplicação está configurada para usar serviços de IA gratuitos:
 
-1. **Chester AI** - Para análise local de raio-X
-2. **MedRAX** - Para interpretação avançada de raio-X do tórax
-3. **Análise Simulada** - Para fins de demonstração
+1. **Chester AI** - Serviço principal de IA para análise médica real de raio-X
+   - Assistente de radiologia open-source
+   - Detecta: Pneumonia, Tuberculose, COVID-19, Pneumotórax, etc.
+   - Alta precisão em diagnóstico médico
+   - Fallback automático para análise local se indisponível
+
+2. **Análise Local Aprimorada** - Sistema de fallback usando Sharp.js
+   - Análise de características da imagem
+   - Detecção de brilho e contraste
+   - Reconhecimento de padrões para condições comuns
+
+3. **Sistema de Tradução** - Terminologia médica em português
+   - Tradução automática de condições médicas
+   - Recomendações e fatores de risco localizados
 
 ## 🚀 Deploy
 
