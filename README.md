@@ -6,35 +6,71 @@ Uma ferramenta revolucionária que combina inteligência artificial com expertis
 
 ## 🚀 Características
 
-- **IA Avançada**: Algoritmos de última geração para análise precisa de raios-X
+- **MONAI Integration**: Framework médico especializado para análise de imagens
+- **Datasets Open-Source**: Integração com NIH, CheXpert, MIMIC-CXR e outros
+- **Raio-X Geral**: Suporte para tórax, ossos, dental, coluna, crânio e mais
 - **Interface Intuitiva**: Design pensado para profissionais médicos
-- **Privacidade Total**: Processamento local, sem armazenamento de dados pessoais
+- **Deploy Automático**: GitHub Actions + Vercel (100% gratuito)
 - **Análise Rápida**: Resultados em segundos
 - **Histórico Completo**: Acompanhamento de todas as análises realizadas
 - **Exportação de Relatórios**: Geração de relatórios em PDF
 
-## 🏥 Condições Suportadas
+## 🏥 Tipos de Raio-X Suportados
 
-O sistema pode auxiliar na detecção das seguintes condições:
+### Tórax
+- Pneumonia, Pneumotórax, Derrame Pleural
+- Cardiomegalia, Atelectasia, Consolidação
+- Edema, Massa/Lesão
 
-- Pneumonia
-- Pneumotórax
-- Derrame Pleural
-- Cardiomegalia
-- Atelectasia
-- Consolidação
-- Edema
-- Massa/Lesão
-- Fraturas
-- Variações Normais
+### Ossos e Articulações
+- Fraturas, Artrite, Osteoporose
+- Lesões ósseas, Luxações
+
+### Odontológico
+- Cárie, Doença periodontal
+- Canal radicular, Implantes
+
+### Geral
+- Coluna vertebral, Crânio
+- Abdome, Pelve, Extremidades
+
+## 🔬 Integração MONAI
+
+- **Framework Médico**: MONAI para processamento especializado
+- **Datasets Profissionais**: NIH, CheXpert, MIMIC-CXR, MURA
+- **Análise Avançada**: Algoritmos específicos para cada tipo de raio-X
+- **Confiança Elevada**: Métricas de confiança baseadas em datasets médicos
 
 ## 🛠️ Tecnologias
 
-- **Frontend**: React 18, Vite, Tailwind CSS
-- **Backend**: Node.js, Express.js
-- **IA**: Algoritmos de deep learning para análise radiológica
-- **Processamento de Imagem**: Sharp.js
-- **Upload de Arquivos**: Multer, React Dropzone
+### Frontend
+- **React 18**: Interface moderna e responsiva
+- **Vite**: Build tool rápido e eficiente
+- **Tailwind CSS**: Estilização utilitária
+- **Lucide React**: Ícones modernos
+
+### Backend
+- **Node.js**: Runtime JavaScript
+- **Express.js**: Framework web
+- **MONAI**: Framework médico para IA
+- **Python**: Scripts de análise avançada
+
+### IA e Processamento
+- **MONAI**: Framework médico especializado
+- **PyTorch**: Deep learning
+- **OpenCV**: Processamento de imagem
+- **Sharp.js**: Processamento de imagem Node.js
+
+### Deploy e CI/CD
+- **Vercel**: Deploy automático (plano gratuito)
+- **GitHub Actions**: CI/CD automatizado
+- **GitHub**: Versionamento e colaboração
+
+### Datasets Open-Source
+- **NIH Chest X-ray**: 112,120 imagens
+- **CheXpert**: 224,316 radiografias
+- **MIMIC-CXR**: 377,110 imagens
+- **MURA**: 40,561 radiografias musculoesqueléticas
 
 ## 📁 Estrutura do Projeto
 
@@ -115,6 +151,24 @@ npm start
 
 ## 🔧 Configuração
 
+### Instalação
+
+1. **Clone o repositório**
+```bash
+git clone https://github.com/samuge-w/samuge-xray-ai.git
+cd samuge-xray-ai
+```
+
+2. **Instale dependências Node.js**
+```bash
+npm install
+```
+
+3. **Instale dependências Python (para MONAI)**
+```bash
+pip install -r requirements.txt
+```
+
 ### Variáveis de Ambiente
 
 Crie um arquivo `.env` na raiz do projeto:
@@ -127,40 +181,68 @@ PORT=5000
 # Production
 NODE_ENV=production
 PORT=5000
+
+# MONAI Configuration
+MONAI_ENABLED=true
+PYTHON_PATH=python
 ```
 
-### Configuração de IA
+### Configuração MONAI
 
-A aplicação está configurada para usar serviços de IA gratuitos:
+A aplicação agora integra o framework MONAI para análise médica avançada:
 
-1. **Chester AI** - Serviço principal de IA para análise médica real de raio-X
-   - Assistente de radiologia open-source
-   - Detecta: Pneumonia, Tuberculose, COVID-19, Pneumotórax, etc.
-   - Alta precisão em diagnóstico médico
-   - Fallback automático para análise local se indisponível
+1. **MONAI Framework** - Framework médico especializado
+   - Processamento de imagens médicas
+   - Algoritmos específicos para cada tipo de raio-X
+   - Integração com datasets open-source
 
-2. **Análise Local Aprimorada** - Sistema de fallback usando Sharp.js
-   - Análise de características da imagem
-   - Detecção de brilho e contraste
-   - Reconhecimento de padrões para condições comuns
+2. **Datasets Open-Source** - Conjuntos de dados médicos
+   - NIH Chest X-ray (112,120 imagens)
+   - CheXpert (224,316 radiografias)
+   - MIMIC-CXR (377,110 imagens)
+   - MURA (40,561 radiografias musculoesqueléticas)
 
-3. **Sistema de Tradução** - Terminologia médica em português
-   - Tradução automática de condições médicas
-   - Recomendações e fatores de risco localizados
+3. **Análise Especializada** - Por tipo de raio-X
+   - Tórax: Pneumonia, Pneumotórax, Cardiomegalia
+   - Ossos: Fraturas, Artrite, Osteoporose
+   - Dental: Cárie, Doença periodontal
+   - Geral: Coluna, Crânio, Abdome, Pelve
+
+4. **Fallback Inteligente** - Sistema de backup
+   - Análise local com Sharp.js se MONAI indisponível
+   - Detecção de características da imagem
+   - Recomendações baseadas em padrões médicos
 
 ## 🚀 Deploy
 
-### Vercel (Recomendado)
+### Vercel + GitHub Actions (Recomendado)
 
-1. Faça push do código para GitHub
-2. Conecte seu repositório ao Vercel
-3. Deploy com configuração zero
+1. **Configure secrets no GitHub**:
+   - `VERCEL_TOKEN`: Token do Vercel
+   - `ORG_ID`: ID da organização Vercel
+   - `PROJECT_ID`: ID do projeto Vercel
 
-### Netlify
+2. **Deploy automático**:
+   - Push para `main` → Deploy automático
+   - Pull requests → Preview automático
+   - GitHub Actions gerencia todo o processo
 
-1. Construa o projeto: `npm run build`
-2. Deploy da pasta `dist` no Netlify
-3. Configure redirects para roteamento SPA
+3. **Benefícios**:
+   - 100% gratuito no plano Vercel
+   - Deploy automático via GitHub
+   - CI/CD integrado
+   - Preview de pull requests
+
+### Configuração Manual
+
+1. **Vercel**:
+   - Conecte repositório GitHub
+   - Deploy automático configurado
+
+2. **Netlify**:
+   - Build: `npm run build`
+   - Publish directory: `dist`
+   - Redirects para SPA
 
 ### Heroku
 

@@ -3,7 +3,17 @@
   "builds": [
     {
       "src": "server.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    },
+    {
+      "src": "api/analyze-xray.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
     },
     {
       "src": "package.json",
@@ -15,6 +25,10 @@
   ],
   "routes": [
     {
+      "src": "/api/analyze-xray",
+      "dest": "/api/analyze-xray.py"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/server.js"
     },
@@ -24,6 +38,17 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production"
-  }
+    "NODE_ENV": "production",
+    "PYTHON_VERSION": "3.9"
+  },
+  "functions": {
+    "server.js": {
+      "maxDuration": 30
+    },
+    "api/analyze-xray.py": {
+      "maxDuration": 30
+    }
+  },
+  "regions": ["iad1"],
+  "framework": null
 }
