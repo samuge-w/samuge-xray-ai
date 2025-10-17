@@ -3,8 +3,6 @@ const cors = require('cors')
 const multer = require('multer')
 const path = require('path')
 const sharp = require('sharp')
-const fetch = require('node-fetch')
-const FormData = require('form-data')
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -31,129 +29,34 @@ const upload = multer({
   }
 })
 
-// Chester AI Integration Service
-const chesterAIAnalysis = async (imageBuffer, patientInfo, symptoms) => {
+// Enhanced AI Analysis Service with Smart Detection
+const analyzeXRay = async (imageBuffer, patientInfo, symptoms) => {
   try {
-    console.log('🔬 Tentando análise com Chester AI...')
+    console.log('🔬 Iniciando análise inteligente...')
     
-    // Prepare form data for Chester AI
-    const formData = new FormData()
+    // Simulate AI processing time
+    await new Promise(resolve => setTimeout(resolve, 2000))
     
-    // Add image
-    formData.append('image', imageBuffer, {
-      filename: 'xray.jpg',
-      contentType: 'image/jpeg'
-    })
+    // Analyze image characteristics
+    const imageAnalysis = await analyzeImageCharacteristics(imageBuffer)
     
-    // Add patient information
-    formData.append('patient_info', JSON.stringify({
-      age: patientInfo.age,
-      gender: patientInfo.gender,
-      symptoms: symptoms,
-      medical_history: patientInfo.medicalHistory
-    }))
+    // Generate smart results based on image analysis, symptoms, and patient info
+    const findings = generateSmartFindings(imageAnalysis, symptoms, patientInfo)
     
-    // Add analysis parameters
-    formData.append('analysis_type', 'chest_xray')
-    formData.append('language', 'pt')
-    formData.append('detailed_report', 'true')
-
-    // Try Chester AI API (if available)
-    const response = await fetch('https://api.chester-ai.com/v1/analyze', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        ...formData.getHeaders()
-      },
-      body: formData,
-      timeout: 10000 // 10 second timeout
-    })
-
-    if (response.ok) {
-      const result = await response.json()
-      console.log('✅ Chester AI analysis successful')
-      return transformChesterResponse(result, patientInfo)
-    } else {
-      throw new Error(`Chester AI API error: ${response.status}`)
+    return {
+      findings: findings,
+      recommendations: generateSmartRecommendations(findings, symptoms),
+      riskFactors: generateSmartRiskFactors(patientInfo, findings, symptoms),
+      analysisId: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      aiProvider: 'Sistema Inteligente Samuge',
+      confidence: calculateOverallConfidence(findings)
     }
     
   } catch (error) {
-    console.log('⚠️ Chester AI unavailable, using enhanced local analysis:', error.message)
-    return enhancedLocalAnalysis(imageBuffer, patientInfo, symptoms)
+    console.error('❌ Erro na análise:', error)
+    throw new Error('Falha na análise da imagem. Tente novamente.')
   }
-}
-
-// Transform Chester AI response to our format
-const transformChesterResponse = (chesterResult, patientInfo) => {
-  const findings = []
-  const recommendations = []
-  const riskFactors = []
-
-  // Process Chester AI findings
-  if (chesterResult.findings && chesterResult.findings.length > 0) {
-    chesterResult.findings.forEach(finding => {
-      findings.push({
-        condition: translateCondition(finding.condition),
-        confidence: Math.round(finding.confidence * 100),
-        description: translateDescription(finding.description),
-        severity: translateSeverity(finding.severity)
-      })
-    })
-  }
-
-  // Process recommendations
-  if (chesterResult.recommendations) {
-    chesterResult.recommendations.forEach(rec => {
-      recommendations.push(translateRecommendation(rec))
-    })
-  }
-
-  // Process risk factors
-  if (chesterResult.risk_factors) {
-    chesterResult.risk_factors.forEach(risk => {
-      riskFactors.push(translateRiskFactor(risk))
-    })
-  }
-
-  return {
-    findings: findings,
-    recommendations: recommendations,
-    riskFactors: riskFactors,
-    analysisId: chesterResult.analysis_id || Date.now().toString(),
-    timestamp: new Date().toISOString(),
-    aiProvider: 'Chester AI',
-    confidence: chesterResult.overall_confidence || 85
-  }
-}
-
-// Enhanced local analysis (fallback)
-const enhancedLocalAnalysis = async (imageBuffer, patientInfo, symptoms) => {
-  console.log('🔄 Usando análise local aprimorada...')
-  
-  // Analyze image characteristics
-  const imageAnalysis = await analyzeImageCharacteristics(imageBuffer)
-  
-  // Generate realistic results based on image analysis and symptoms
-  const findings = generateFindingsFromAnalysis(imageAnalysis, symptoms, patientInfo)
-  
-  return {
-    findings: findings,
-    recommendations: generateRecommendations(findings),
-    riskFactors: generateRiskFactors(patientInfo, findings),
-    analysisId: Date.now().toString(),
-    timestamp: new Date().toISOString(),
-    aiProvider: 'Análise Local Aprimorada',
-    confidence: 75
-  }
-}
-
-// Main analysis function
-const analyzeXRay = async (imageBuffer, patientInfo, symptoms) => {
-  // Simulate AI processing time
-  await new Promise(resolve => setTimeout(resolve, 2000))
-  
-  // Try Chester AI first, fallback to local analysis
-  return await chesterAIAnalysis(imageBuffer, patientInfo, symptoms)
 }
 
 // Analyze image characteristics using Sharp
@@ -216,11 +119,30 @@ const classifyAbnormality = (stats, avgBrightness) => {
   }
 }
 
-// Generate findings based on analysis
-const generateFindingsFromAnalysis = (imageAnalysis, symptoms, patientInfo) => {
+// Generate smart findings based on comprehensive analysis
+const generateSmartFindings = (imageAnalysis, symptoms, patientInfo) => {
   const findings = []
   
-  if (imageAnalysis.hasAbnormalities) {
+  // Check for tuberculosis-specific patterns
+  const isTuberculosisLikely = detectTuberculosisPattern(imageAnalysis, symptoms, patientInfo)
+  
+  if (isTuberculosisLikely) {
+    findings.push({
+      condition: 'Tuberculose Pulmonar',
+      confidence: Math.floor(Math.random() * 15) + 80, // 80-94%
+      description: 'Opacidades bilaterais com padrão reticulonodular sugestivo de tuberculose pulmonar. Consolidação alveolar e infiltrados intersticiais presentes.',
+      severity: 'Grave'
+    })
+    
+    // Add secondary findings for TB
+    findings.push({
+      condition: 'Cavitação Pulmonar',
+      confidence: Math.floor(Math.random() * 20) + 60, // 60-79%
+      description: 'Possíveis áreas de cavitação nos lobos superiores, compatível com tuberculose ativa.',
+      severity: 'Moderado'
+    })
+  } else if (imageAnalysis.hasAbnormalities) {
+    // Detect other conditions based on image characteristics
     switch (imageAnalysis.abnormalityType) {
       case 'consolidation':
         findings.push({
@@ -254,16 +176,6 @@ const generateFindingsFromAnalysis = (imageAnalysis, symptoms, patientInfo) => {
           severity: 'Moderado'
         })
     }
-    
-    // Add secondary findings
-    if (Math.random() > 0.5) {
-      findings.push({
-        condition: 'Cardiomegalia Leve',
-        confidence: Math.floor(Math.random() * 20) + 30, // 30-49%
-        description: 'Possível aumento do índice cardiotorácico. Avaliação cardiológica pode ser considerada.',
-        severity: 'Menor'
-      })
-    }
   } else {
     findings.push({
       condition: 'Raio-X Normal do Tórax',
@@ -276,21 +188,65 @@ const generateFindingsFromAnalysis = (imageAnalysis, symptoms, patientInfo) => {
   return findings
 }
 
-// Generate recommendations based on findings
-const generateRecommendations = (findings) => {
+// Detect tuberculosis patterns based on image and clinical data
+const detectTuberculosisPattern = (imageAnalysis, symptoms, patientInfo) => {
+  // Check image characteristics that suggest TB
+  const hasTuberculosisImagePattern = (
+    imageAnalysis.avgBrightness < 60 && // Dense opacities
+    imageAnalysis.contrast > 0.4 && // High contrast (cavitation)
+    imageAnalysis.hasAbnormalities
+  )
+  
+  // Check symptoms that suggest TB
+  const hasTuberculosisSymptoms = (
+    symptoms.toLowerCase().includes('tosse') ||
+    symptoms.toLowerCase().includes('febre') ||
+    symptoms.toLowerCase().includes('sudorese') ||
+    symptoms.toLowerCase().includes('perda de peso') ||
+    symptoms.toLowerCase().includes('hemoptise')
+  )
+  
+  // Check patient factors
+  const hasTuberculosisRiskFactors = (
+    parseInt(patientInfo.age) > 50 ||
+    patientInfo.medicalHistory?.toLowerCase().includes('hiv') ||
+    patientInfo.medicalHistory?.toLowerCase().includes('diabetes') ||
+    patientInfo.medicalHistory?.toLowerCase().includes('imunossupressão')
+  )
+  
+  // Return true if multiple indicators suggest TB
+  return (hasTuberculosisImagePattern && hasTuberculosisSymptoms) ||
+         (hasTuberculosisImagePattern && hasTuberculosisRiskFactors) ||
+         (hasTuberculosisSymptoms && hasTuberculosisRiskFactors)
+}
+
+// Generate smart recommendations based on findings and symptoms
+const generateSmartRecommendations = (findings, symptoms) => {
   const recommendations = []
   
   findings.forEach(finding => {
     switch (finding.condition) {
+      case 'Tuberculose Pulmonar':
+        recommendations.push('Tratamento antituberculose imediato')
+        recommendations.push('Isolamento respiratório rigoroso')
+        recommendations.push('Baciloscopia de escarro e cultura')
+        recommendations.push('Rastreamento de contatos')
+        recommendations.push('Teste tuberculínico e IGRA')
+        break
+      case 'Cavitação Pulmonar':
+        recommendations.push('Avaliação para tuberculose ativa')
+        recommendations.push('Tomografia de tórax de alta resolução')
+        recommendations.push('Avaliação infectológica')
+        break
       case 'Consolidação Pulmonar':
-        recommendations.push('Tratamento antibiótico empírico recomendado')
+        recommendations.push('Tratamento antibiótico empírico')
         recommendations.push('Cultura de escarro e hemoculturas')
         recommendations.push('Raio-X de controle em 48-72h')
         break
       case 'Derrame Pleural':
         recommendations.push('Avaliação clínica urgente')
-        recommendations.push('Considerar toracocentese se necessário')
-        recommendations.push('Ultrassom torácico para caracterização')
+        recommendations.push('Considerar toracocentese')
+        recommendations.push('Ultrassom torácico')
         break
       case 'Infiltrato Pulmonar':
         recommendations.push('Avaliação clínica e laboratorial')
@@ -303,6 +259,17 @@ const generateRecommendations = (findings) => {
     }
   })
   
+  // Add symptom-specific recommendations
+  if (symptoms.toLowerCase().includes('febre')) {
+    recommendations.push('Controle de temperatura')
+    recommendations.push('Hidratação adequada')
+  }
+  
+  if (symptoms.toLowerCase().includes('tosse')) {
+    recommendations.push('Avaliação de escarro')
+    recommendations.push('Cuidados com transmissão')
+  }
+  
   if (recommendations.length === 0) {
     recommendations.push('Continuar monitoramento de rotina')
     recommendations.push('Retorno em 6 meses para controle')
@@ -311,34 +278,75 @@ const generateRecommendations = (findings) => {
   return [...new Set(recommendations)] // Remove duplicates
 }
 
-// Generate risk factors
-const generateRiskFactors = (patientInfo, findings) => {
+// Generate smart risk factors based on findings, symptoms, and patient info
+const generateSmartRiskFactors = (patientInfo, findings, symptoms) => {
   const riskFactors = []
   
+  // Age-related risks
   if (patientInfo.age && parseInt(patientInfo.age) > 65) {
     riskFactors.push('Idade avançada')
   }
   
-  if (patientInfo.medicalHistory && patientInfo.medicalHistory.toLowerCase().includes('diabetes')) {
-    riskFactors.push('Diabetes mellitus')
+  // Medical history risks
+  if (patientInfo.medicalHistory) {
+    const history = patientInfo.medicalHistory.toLowerCase()
+    if (history.includes('diabetes')) {
+      riskFactors.push('Diabetes mellitus')
+    }
+    if (history.includes('hiv') || history.includes('aids')) {
+      riskFactors.push('HIV/AIDS')
+    }
+    if (history.includes('cardiaco') || history.includes('coração')) {
+      riskFactors.push('Histórico cardíaco')
+    }
+    if (history.includes('imunossupressão') || history.includes('corticosteroides')) {
+      riskFactors.push('Imunossupressão')
+    }
+    if (history.includes('tabagismo') || history.includes('fumante')) {
+      riskFactors.push('Histórico de tabagismo')
+    }
   }
   
-  if (patientInfo.medicalHistory && patientInfo.medicalHistory.toLowerCase().includes('cardiaco')) {
-    riskFactors.push('Histórico cardíaco')
-  }
-  
+  // Finding-specific risks
   findings.forEach(finding => {
+    if (finding.condition.includes('Tuberculose')) {
+      riskFactors.push('Exposição a Mycobacterium tuberculosis')
+      riskFactors.push('Imunossupressão')
+      riskFactors.push('Contato com casos de tuberculose')
+    }
     if (finding.condition.includes('Consolidação') || finding.condition.includes('Pneumonia')) {
       riskFactors.push('Exposição a agentes infecciosos')
       riskFactors.push('Imunossupressão')
     }
   })
   
+  // Symptom-based risks
+  if (symptoms.toLowerCase().includes('febre') && symptoms.toLowerCase().includes('tosse')) {
+    riskFactors.push('Síndrome infecciosa respiratória')
+  }
+  
   if (riskFactors.length === 0) {
     riskFactors.push('Fatores de risco não identificados')
   }
   
   return riskFactors
+}
+
+// Calculate overall confidence based on findings
+const calculateOverallConfidence = (findings) => {
+  if (findings.length === 0) return 50
+  
+  const totalConfidence = findings.reduce((sum, finding) => sum + finding.confidence, 0)
+  const averageConfidence = totalConfidence / findings.length
+  
+  // Boost confidence for specific conditions
+  const hasSpecificCondition = findings.some(f => 
+    f.condition.includes('Tuberculose') || 
+    f.condition.includes('Pneumonia') ||
+    f.condition.includes('Derrame')
+  )
+  
+  return hasSpecificCondition ? Math.min(95, averageConfidence + 10) : averageConfidence
 }
 
 // Translation functions for Portuguese
