@@ -24,7 +24,7 @@ try:
     from monai.data import Dataset, DataLoader
     from monai.transforms import (
         Compose, LoadImage, Resize, NormalizeIntensity, 
-        ToTensor, AddChannel, EnsureChannelFirst
+        ToTensor, EnsureChannelFirst
     )
     from monai.networks.nets import DenseNet121
     MONAI_AVAILABLE = True
