@@ -1,74 +1,63 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Upload, History, Brain, Shield, Clock, Users, TrendingUp, Award } from 'lucide-react'
+import { Upload, History, Brain, Shield, Clock, Users, TrendingUp, Award, Database, Zap } from 'lucide-react'
+import statsService from '../services/statsService'
 
 const Dashboard = () => {
-  const stats = [
-    {
-      title: 'Análises Hoje',
-      value: '12',
-      change: '+3',
-      changeType: 'positive',
-      icon: TrendingUp
-    },
-    {
-      title: 'Total de Pacientes',
-      value: '1,247',
-      change: '+15%',
-      changeType: 'positive',
-      icon: Users
-    },
-    {
-      title: 'Precisão Média',
-      value: '94.2%',
-      change: '+2.1%',
-      changeType: 'positive',
-      icon: Award
-    },
-    {
-      title: 'Tempo Médio',
-      value: '2.3min',
-      change: '-0.5min',
-      changeType: 'positive',
-      icon: Clock
-    }
-  ]
+  const [stats, setStats] = useState([])
+  const [recentAnalyses, setRecentAnalyses] = useState([])
+  const [frameworkInfo, setFrameworkInfo] = useState(null)
+  const [systemHealth, setSystemHealth] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const recentAnalyses = [
-    {
-      id: 1,
-      patientName: 'Maria Silva',
-      age: 45,
-      gender: 'Feminino',
-      date: '2024-01-15',
-      time: '14:30',
-      findings: 'Raio-X normal do tórax',
-      confidence: 95,
-      status: 'Concluído'
-    },
-    {
-      id: 2,
-      patientName: 'João Santos',
-      age: 32,
-      gender: 'Masculino',
-      date: '2024-01-15',
-      time: '11:15',
-      findings: 'Possível pneumonia no lobo inferior direito',
-      confidence: 87,
-      status: 'Concluído'
-    },
-    {
-      id: 3,
-      patientName: 'Ana Costa',
-      age: 67,
-      gender: 'Feminino',
-      date: '2024-01-14',
-      time: '16:45',
-      findings: 'Raio-X normal do tórax',
-      confidence: 92,
-      status: 'Concluído'
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
+
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true)
+      
+      // Load statistics
+      const dashboardStats = await statsService.getDashboardStats()
+      const statsArray = [
+        {
+          ...dashboardStats.todayAnalyses,
+          icon: TrendingUp
+        },
+        {
+          ...dashboardStats.totalPatients,
+          icon: Users
+        },
+        {
+          ...dashboardStats.avgConfidence,
+          icon: Award
+        },
+        {
+          ...dashboardStats.avgProcessingTime,
+          icon: Clock
+        }
+      ]
+      setStats(statsArray)
+
+      // Load recent analyses
+      const recent = await statsService.getRecentAnalyses()
+      setRecentAnalyses(recent)
+
+      // Load framework info
+      const framework = statsService.getFrameworkInfo()
+      setFrameworkInfo(framework)
+
+      // Load system health
+      const health = await statsService.getSystemHealth()
+      setSystemHealth(health)
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error)
+    } finally {
+      setIsLoading(false)
     }
-  ]
+  }
 
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
@@ -217,6 +206,110 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* MONAI Framework Info */}
+      {frameworkInfo && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              MONAI Framework
+            </h2>
+            <div className="flex items-center space-x-2">
+              <Database className="w-5 h-5 text-medical-600" />
+              <span className="text-sm text-gray-600">
+                {frameworkInfo.totalImages.toLocaleString()} imagens
+              </span>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Capacidades</h3>
+              <div className="space-y-2">
+                {frameworkInfo.capabilities.slice(0, 4).map((capability, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-medical-600 rounded-full"></div>
+                    <span className="text-sm text-gray-700">{capability}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Precisão por Tipo</h3>
+              <div className="space-y-2">
+                {Object.entries(frameworkInfo.accuracy).slice(0, 4).map(([type, accuracy]) => (
+                  <div key={type} className="flex justify-between items-center">
+                    <span className="text-sm text-gray-700 capitalize">{type}</span>
+                    <span className="text-sm font-medium text-medical-600">{accuracy}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* System Health */}
+      {systemHealth && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Status do Sistema
+            </h2>
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${
+                systemHealth.status === 'healthy' ? 'bg-green-500' : 'bg-red-500'
+              }`}></div>
+              <span className="text-sm text-gray-600 capitalize">
+                {systemHealth.status}
+              </span>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <Zap className="w-4 h-4 text-green-600" />
+              </div>
+              <p className="text-xs text-gray-600">MONAI</p>
+              <p className="text-sm font-medium text-gray-900 capitalize">
+                {systemHealth.monai}
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <Database className="w-4 h-4 text-blue-600" />
+              </div>
+              <p className="text-xs text-gray-600">Datasets</p>
+              <p className="text-sm font-medium text-gray-900 capitalize">
+                {systemHealth.datasets}
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <Brain className="w-4 h-4 text-purple-600" />
+              </div>
+              <p className="text-xs text-gray-600">API</p>
+              <p className="text-sm font-medium text-gray-900 capitalize">
+                {systemHealth.api}
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <Award className="w-4 h-4 text-orange-600" />
+              </div>
+              <p className="text-xs text-gray-600">Uptime</p>
+              <p className="text-sm font-medium text-gray-900">
+                {systemHealth.uptime}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Features */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="card text-center">
@@ -224,10 +317,22 @@ const Dashboard = () => {
             <Brain className="w-6 h-6 text-medical-600" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            IA Avançada
+            MONAI Framework
           </h3>
           <p className="text-gray-600">
-            Algoritmos de última geração para análise precisa de raios-X
+            Medical Open Network for AI - Framework especializado em imagens médicas
+          </p>
+        </div>
+
+        <div className="card text-center">
+          <div className="w-12 h-12 bg-medical-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+            <Database className="w-6 h-6 text-medical-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Datasets Open-Source
+          </h3>
+          <p className="text-gray-600">
+            {frameworkInfo ? `${frameworkInfo.totalImages.toLocaleString()} imagens` : '946,586 imagens'} de raios-X reais
           </p>
         </div>
 
@@ -236,22 +341,10 @@ const Dashboard = () => {
             <Shield className="w-6 h-6 text-medical-600" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            Privacidade Total
+            Segurança e Privacidade
           </h3>
           <p className="text-gray-600">
-            Processamento local, sem armazenamento de dados pessoais
-          </p>
-        </div>
-
-        <div className="card text-center">
-          <div className="w-12 h-12 bg-medical-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-            <Award className="w-6 h-6 text-medical-600" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            Precisão Clínica
-          </h3>
-          <p className="text-gray-600">
-            Desenvolvido por especialistas em radiologia médica
+            Autenticação JWT, processamento seguro, sem armazenamento de dados pessoais
           </p>
         </div>
       </div>

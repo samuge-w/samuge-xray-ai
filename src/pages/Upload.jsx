@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone'
 import { Upload as UploadIcon, X, FileImage, Brain, AlertCircle, CheckCircle, Clock, Key } from 'lucide-react'
 import toast from 'react-hot-toast'
 import AuthModal from '../components/AuthModal'
+import statsService from '../services/statsService'
 
 const Upload = () => {
   const [uploadedFiles, setUploadedFiles] = useState([])
@@ -136,6 +137,21 @@ const Upload = () => {
       }
       
       setAnalysisResult(transformedResult)
+      
+      // Store analysis result for statistics
+      const analysisData = {
+        patientName: patientInfo.name || 'Anonymous',
+        age: patientInfo.age || 0,
+        gender: patientInfo.gender || 'Unknown',
+        xrayType: xrayType,
+        findings: transformedResult.findings.map(f => f.description).join('; '),
+        confidence: transformedResult.confidence,
+        status: 'Concluído',
+        framework: transformedResult.aiProvider,
+        symptoms: symptoms
+      }
+      
+      statsService.storeAnalysis(analysisData)
       toast.success('Análise concluída com sucesso!')
     } catch (error) {
       toast.error('Análise falhou. Tente novamente.')
