@@ -29,8 +29,7 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production",
-    "PYTHON_VERSION": "3.9"
+    "NODE_ENV": "production"
   },
   "regions": ["iad1"],
   "framework": null,
