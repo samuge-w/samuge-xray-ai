@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload as UploadIcon, X, FileImage, Brain, AlertCircle, CheckCircle, Clock } from 'lucide-react'
+import { Upload as UploadIcon, X, FileImage, Brain, AlertCircle, CheckCircle, Clock, Key } from 'lucide-react'
 import toast from 'react-hot-toast'
+import AuthModal from '../components/AuthModal'
 
 const Upload = () => {
   const [uploadedFiles, setUploadedFiles] = useState([])
@@ -18,6 +19,18 @@ const Upload = () => {
   const [xrayType, setXrayType] = useState('chest')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState(null)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [authInfo, setAuthInfo] = useState(() => {
+    // Check for existing auth info in localStorage
+    const token = localStorage.getItem('auth_token')
+    const apiKey = localStorage.getItem('api_key')
+    const userInfo = localStorage.getItem('user_info')
+    
+    if (token || apiKey) {
+      return userInfo ? JSON.parse(userInfo) : { type: 'authenticated' }
+    }
+    return null
+  })
 
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
     accept: {
@@ -78,12 +91,25 @@ const Upload = () => {
         }
       }
 
+      // Prepare headers with authentication if available
+      const headers = {
+        'Content-Type': 'application/json',
+      }
+      
+      // Add authentication header if available
+      const token = localStorage.getItem('auth_token')
+      const apiKey = localStorage.getItem('api_key')
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      } else if (apiKey) {
+        headers['Authorization'] = `ApiKey ${apiKey}`
+      }
+
       // Call the MONAI API
       const response = await fetch('/api/analyze-xray', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(payload)
       })
 
@@ -145,6 +171,19 @@ const Upload = () => {
     setAnalysisResult(null)
   }
 
+  const handleAuthSuccess = (authData) => {
+    setAuthInfo(authData)
+    toast.success('Authentication successful!')
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('api_key')
+    localStorage.removeItem('user_info')
+    setAuthInfo(null)
+    toast.success('Logged out successfully')
+  }
+
   const getSeverityColor = (severity) => {
     switch (severity.toLowerCase()) {
       case 'normal':
@@ -163,6 +202,33 @@ const Upload = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="text-center">
+        <div className="flex justify-between items-center mb-4">
+          <div></div>
+          <div className="flex items-center space-x-2">
+            {authInfo ? (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">
+                  {authInfo.user_id || 'Authenticated'}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="text-sm text-red-600 hover:text-red-800"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="flex items-center space-x-1 px-3 py-1 bg-medical-600 text-white rounded-md hover:bg-medical-700 text-sm"
+              >
+                <Key className="w-4 h-4" />
+                <span>Authenticate</span>
+              </button>
+            )}
+          </div>
+        </div>
+        
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Enviar Raio-X para Análise com IA
         </h1>
@@ -491,6 +557,13 @@ const Upload = () => {
           </div>
         </div>
       </div>
+
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
+      />
     </div>
   )
 }

@@ -17,9 +17,11 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'services'))
 
 try:
     from monai_service import MONAIService
+    from auth import get_auth_info
 except ImportError as e:
-    logging.error(f"Could not import MONAIService: {e}")
+    logging.error(f"Could not import required modules: {e}")
     MONAIService = None
+    get_auth_info = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -46,7 +48,7 @@ def handler(request):
     # Set CORS headers
     headers = {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Content-Type': 'application/json'
     }
@@ -58,6 +60,31 @@ def handler(request):
             'headers': headers,
             'body': json.dumps({'message': 'CORS preflight'})
         }
+    
+    # Check authentication (optional for demo - can be enabled for production)
+    auth_required = os.environ.get('AUTH_REQUIRED', 'false').lower() == 'true'
+    if auth_required and get_auth_info:
+        auth_info = get_auth_info(request)
+        if not auth_info:
+            return {
+                'statusCode': 401,
+                'headers': headers,
+                'body': json.dumps({
+                    'error': 'Authentication required',
+                    'message': 'Please provide valid Authorization header (Bearer token or ApiKey)'
+                })
+            }
+        
+        # Check if user has analyze_xray permission
+        if 'analyze_xray' not in auth_info.get('permissions', []):
+            return {
+                'statusCode': 403,
+                'headers': headers,
+                'body': json.dumps({
+                    'error': 'Insufficient permissions',
+                    'message': 'analyze_xray permission required'
+                })
+            }
     
     try:
         # Parse request body
