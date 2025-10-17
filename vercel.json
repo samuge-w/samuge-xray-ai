@@ -1,44 +1,28 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxLambdaSize": "50mb"
-      }
+  "functions": {
+    "server.js": {
+      "runtime": "@vercel/node",
+      "maxDuration": 30
     },
-        {
-          "src": "api/analyze-xray.py",
-          "use": "@vercel/python",
-          "config": {
-            "maxLambdaSize": "50mb"
-          }
-        },
-        {
-          "src": "api/auth-endpoints.py",
-          "use": "@vercel/python",
-          "config": {
-            "maxLambdaSize": "50mb"
-          }
-        },
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+    "api/analyze-xray.py": {
+      "runtime": "@vercel/python",
+      "maxDuration": 30
+    },
+    "api/auth-endpoints.py": {
+      "runtime": "@vercel/python",
+      "maxDuration": 30
     }
-  ],
+  },
   "routes": [
-        {
-          "src": "/api/analyze-xray",
-          "dest": "/api/analyze-xray.py"
-        },
-        {
-          "src": "/api/auth/(.*)",
-          "dest": "/api/auth-endpoints.py"
-        },
+    {
+      "src": "/api/analyze-xray",
+      "dest": "/api/analyze-xray.py"
+    },
+    {
+      "src": "/api/auth/(.*)",
+      "dest": "/api/auth-endpoints.py"
+    },
     {
       "src": "/api/(.*)",
       "dest": "/server.js"
@@ -52,14 +36,8 @@
     "NODE_ENV": "production",
     "PYTHON_VERSION": "3.9"
   },
-  "functions": {
-    "server.js": {
-      "maxDuration": 30
-    },
-    "api/analyze-xray.py": {
-      "maxDuration": 30
-    }
-  },
   "regions": ["iad1"],
-  "framework": null
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
 }
