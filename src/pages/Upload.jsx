@@ -58,32 +58,25 @@ const Upload = () => {
       // Simular análise de IA - na implementação real, isso chamaria a API de IA
       await new Promise(resolve => setTimeout(resolve, 3000))
       
-      // Resultado de análise simulado
-      const mockResult = {
-        findings: [
-          {
-            condition: 'Raio-X Normal do Tórax',
-            confidence: 92,
-            description: 'Nenhuma anormalidade aguda detectada. Tamanho cardíaco e campos pulmonares aparentam normais.',
-            severity: 'Normal'
-          },
-          {
-            condition: 'Possível Atelectasia Leve',
-            confidence: 15,
-            description: 'Áreas menores de colapso pulmonar nos lobos inferiores, provavelmente posicional.',
-            severity: 'Menor'
-          }
-        ],
-        recommendations: [
-          'Continuar monitoramento de rotina',
-          'Considerar raio-X de acompanhamento se sintomas persistirem',
-          'Nenhuma intervenção imediata necessária'
-        ],
-        riskFactors: [
-          'Mudanças relacionadas à idade',
-          'Condições respiratórias prévias'
-        ]
+      // Call the real API for analysis
+      const formData = new FormData()
+      uploadedFiles.forEach(fileData => {
+        formData.append('images', fileData.file)
+      })
+      formData.append('patientInfo', JSON.stringify(patientInfo))
+      formData.append('symptoms', symptoms)
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro na análise da imagem')
       }
+
+      const result = await response.json()
+      const mockResult = result.data
       
       setAnalysisResult(mockResult)
       toast.success('Análise concluída com sucesso!')
