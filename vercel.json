@@ -2,15 +2,15 @@
   "version": 2,
   "functions": {
     "server.js": {
-      "runtime": "@vercel/node",
+      "runtime": "@vercel/node@3.0.7",
       "maxDuration": 30
     },
     "api/analyze-xray.py": {
-      "runtime": "@vercel/python",
+      "runtime": "@vercel/python@3.0.0",
       "maxDuration": 30
     },
     "api/auth-endpoints.py": {
-      "runtime": "@vercel/python",
+      "runtime": "@vercel/python@3.0.0",
       "maxDuration": 30
     }
   },
