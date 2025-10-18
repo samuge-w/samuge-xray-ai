@@ -42,3 +42,4 @@ EXPOSE 10000
 
 # Start the application
 CMD ["npm", "start"]
+
