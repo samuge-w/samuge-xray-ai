@@ -1056,8 +1056,15 @@ app.use((error, req, res, next) => {
   })
 })
 
-app.listen(PORT, () => {
+// Configure server as per Render official docs
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor Samuge rodando na porta ${PORT}`)
   console.log(`📱 Acesse: http://localhost:${PORT}`)
   console.log(`🔬 Powered by Dr. Silvio Samuge MD, MSc`)
 })
+
+// Set timeouts as recommended by Render docs for 502 fixes
+server.keepAliveTimeout = 120000  // 120 seconds
+server.headersTimeout = 120000    // 120 seconds
+
+console.log('⚙️ Server timeouts configured: keepAlive=120s, headers=120s')
