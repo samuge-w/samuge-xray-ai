@@ -27,8 +27,8 @@ RUN npm install
 
 # Copy Python requirements and install Python dependencies
 COPY api/requirements.txt ./api/
-RUN pip install --upgrade pip && \
-    pip install -r api/requirements.txt
+RUN python3 -m pip install --upgrade pip && \
+    python3 -m pip install -r api/requirements.txt
 
 # Copy application code
 COPY . .
