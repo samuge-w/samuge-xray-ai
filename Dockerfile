@@ -40,6 +40,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Copy application code
 COPY . .
 
+# Fix permissions for node_modules binaries
+RUN chmod +x node_modules/.bin/*
+
 # Build React frontend
 RUN npm run build
 
