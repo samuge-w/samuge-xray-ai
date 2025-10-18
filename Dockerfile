@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3-dev \
+    python3-venv \
     build-essential \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -25,10 +26,16 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Copy Python requirements and install Python dependencies
+# Create Python virtual environment and install dependencies
 COPY api/requirements.txt ./api/
-RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install -r api/requirements.txt
+RUN python3 -m venv /app/venv && \
+    /app/venv/bin/python -m pip install --upgrade pip && \
+    /app/venv/bin/python -m pip install -r api/requirements.txt
+
+# Set environment variables for virtual environment
+ENV PATH="/app/venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # Copy application code
 COPY . .
