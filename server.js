@@ -782,62 +782,107 @@ const getAvailableDatasetsForType = (xrayType) => {
 // Python MONAI Routes via Node.js subprocess
 app.post('/api/analyze-xray', upload.single('image'), async (req, res) => {
   try {
+    console.log('🔍 DEBUG: ===== INICIANDO ANÁLISE =====')
+    console.log('🔍 DEBUG: Timestamp:', new Date().toISOString())
+    
     if (!req.file) {
+      console.log('❌ DEBUG: Nenhuma imagem enviada')
       return res.status(400).json({ error: 'Nenhuma imagem enviada' })
     }
 
     const { patientInfo = '{}', xrayType = 'general' } = req.body
     
+    console.log('🔍 DEBUG: Arquivo recebido:', req.file.originalname)
+    console.log('🔍 DEBUG: Tamanho do arquivo:', req.file.size, 'bytes')
+    console.log('🔍 DEBUG: Tipo do arquivo:', req.file.mimetype)
+    console.log('🔍 DEBUG: X-ray type:', xrayType)
+    console.log('🔍 DEBUG: Patient info:', patientInfo)
+    
     // Save image temporarily
     const tempImagePath = path.join(__dirname, 'temp_image.jpg')
+    console.log('🔍 DEBUG: Salvando imagem temporária em:', tempImagePath)
     fs.writeFileSync(tempImagePath, req.file.buffer)
+    console.log('🔍 DEBUG: Imagem salva com sucesso')
+    
+    // Verify Python script exists
+    const pythonScript = path.join(__dirname, 'api', 'medical_ai_pipeline.py')
+    console.log('🔍 DEBUG: Python script path:', pythonScript)
+    console.log('🔍 DEBUG: Script exists:', fs.existsSync(pythonScript))
     
     // Call Python script via subprocess
+    console.log('🔍 DEBUG: Iniciando processo Python...')
     const pythonProcess = spawn('python', [
-      path.join(__dirname, 'api', 'medical_ai_pipeline.py'),
+      pythonScript,
       tempImagePath,
       xrayType,
       patientInfo
     ])
     
+    console.log('🔍 DEBUG: Processo Python iniciado com PID:', pythonProcess.pid)
+    
     let result = ''
     let error = ''
     
+    // Add timeout for Python process (25 seconds - less than Render limit)
+    const timeout = setTimeout(() => {
+      console.log('⏰ DEBUG: Python process timeout - killing process')
+      pythonProcess.kill()
+    }, 25000)
+    
     pythonProcess.stdout.on('data', (data) => {
-      result += data.toString()
+      const output = data.toString()
+      console.log('📤 DEBUG: Python stdout:', output)
+      result += output
     })
     
     pythonProcess.stderr.on('data', (data) => {
-      error += data.toString()
+      const errorOutput = data.toString()
+      console.log('❌ DEBUG: Python stderr:', errorOutput)
+      error += errorOutput
     })
     
     pythonProcess.on('close', (code) => {
+      console.log('🔍 DEBUG: Python process closed with code:', code)
+      console.log('🔍 DEBUG: Final result length:', result.length)
+      console.log('🔍 DEBUG: Final error length:', error.length)
+      
+      // Clear timeout
+      clearTimeout(timeout)
+      
       // Clean up temp file
       try {
         fs.unlinkSync(tempImagePath)
+        console.log('🔍 DEBUG: Temp file deleted successfully')
       } catch (e) {
-        console.log('Could not delete temp file:', e.message)
+        console.log('⚠️ DEBUG: Could not delete temp file:', e.message)
       }
       
       if (code === 0) {
+        console.log('✅ DEBUG: Python process completed successfully')
         try {
+          console.log('🔍 DEBUG: Attempting to parse result:', result.substring(0, 200) + '...')
           const analysisResult = JSON.parse(result)
+          console.log('✅ DEBUG: JSON parsing successful')
           res.json({
             success: true,
             data: analysisResult
           })
         } catch (parseError) {
-          console.error('Error parsing Python result:', parseError)
+          console.error('❌ DEBUG: Error parsing Python result:', parseError)
+          console.error('❌ DEBUG: Raw result:', result)
           res.status(500).json({ 
             error: 'Erro ao processar resultado da análise',
-            details: parseError.message
+            details: parseError.message,
+            rawResult: result.substring(0, 500)
           })
         }
       } else {
-        console.error('Python process error:', error)
-        console.error('Python result:', result)
+        console.error('❌ DEBUG: Python process failed with code:', code)
+        console.error('❌ DEBUG: Python stderr:', error)
+        console.error('❌ DEBUG: Python stdout:', result)
         
         // Try to provide fallback analysis
+        console.log('🔄 DEBUG: Providing fallback analysis...')
         const fallbackResult = {
           success: true,
           timestamp: new Date().toISOString(),
