@@ -244,3 +244,4 @@ py -3.9 -m pip install monai torch torchvision
 **🎉 Congratulations!** Your MONAI-powered X-ray diagnosis tool is now ready for deployment with support for general X-ray analysis across multiple body parts!
 
 
+

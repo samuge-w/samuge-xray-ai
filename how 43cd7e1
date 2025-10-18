@@ -1,0 +1,15 @@
+[33mcommit 6367f87f64bb6b8d007d97bb626ce928eb303817[m
+Author: Dr. Silvio Samuge <contato@samuge.com>
+Date:   Sat Oct 18 09:37:51 2025 +0200
+
+    fix: Resolve Docker build issues and PORT configuration
+    
+    - Fixed server.js PORT to use 10000 (matches Render configuration)
+    - Updated Dockerfile to use available Python3 packages instead of Python 3.12
+    - Fixed Python symbolic links to match installed version
+    - Resolves Docker build failure with apt-get install error
+    
+    Context7 + Render MCP collaboration: Express.js port configuration
+    and Docker compatibility fixes for successful deployment.
+
+Dockerfile
