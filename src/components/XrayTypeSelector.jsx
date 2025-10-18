@@ -146,3 +146,5 @@ const XrayTypeSelector = ({ selectedType, onTypeChange, className = '' }) => {
 };
 
 export default XrayTypeSelector;
+
+

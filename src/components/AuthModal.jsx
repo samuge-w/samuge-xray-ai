@@ -239,3 +239,5 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
 }
 
 export default AuthModal
+
+

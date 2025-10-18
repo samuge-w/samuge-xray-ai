@@ -1,11 +1,11 @@
 # Multi-stage build for Node.js + Python MONAI app
 FROM node:18-slim
 
-# Install Python 3.12 and system dependencies
+# Install Python 3.9 and system dependencies (MONAI compatible)
 RUN apt-get update && apt-get install -y \
-    python3.12 \
-    python3.12-pip \
-    python3.12-dev \
+    python3.9 \
+    python3.9-pip \
+    python3.9-dev \
     build-essential \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create symlinks for python and pip
-RUN ln -s /usr/bin/python3.12 /usr/bin/python && \
-    ln -s /usr/bin/python3.12 /usr/bin/python3
+RUN ln -s /usr/bin/python3.9 /usr/bin/python && \
+    ln -s /usr/bin/python3.9 /usr/bin/python3
 
 # Set working directory
 WORKDIR /app
@@ -42,4 +42,5 @@ EXPOSE 10000
 
 # Start the application
 CMD ["npm", "start"]
+
 
