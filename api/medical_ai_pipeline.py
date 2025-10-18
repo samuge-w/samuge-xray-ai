@@ -508,14 +508,40 @@ def analyze_medical_image(image_path, xray_type="chest", patient_info=None):
     return medical_pipeline.complete_analysis(image_path, xray_type, patient_info)
 
 if __name__ == "__main__":
-    # Test the pipeline
+    # Main execution for subprocess call
     import sys
-    if len(sys.argv) >= 2:
-        image_path = sys.argv[1]
-        xray_type = sys.argv[2] if len(sys.argv) > 2 else "chest"
-        patient_info = json.loads(sys.argv[3]) if len(sys.argv) > 3 else {}
-        
-        result = analyze_medical_image(image_path, xray_type, patient_info)
-        print(json.dumps(result, indent=2))
-    else:
-        print("Usage: python medical_ai_pipeline.py <image_path> [xray_type] [patient_info_json]")
+    try:
+        if len(sys.argv) >= 2:
+            image_path = sys.argv[1]
+            xray_type = sys.argv[2] if len(sys.argv) > 2 else "chest"
+            patient_info_str = sys.argv[3] if len(sys.argv) > 3 else "{}"
+            
+            # Parse patient info
+            try:
+                patient_info = json.loads(patient_info_str)
+            except:
+                patient_info = {}
+            
+            # Run analysis
+            result = analyze_medical_image(image_path, xray_type, patient_info)
+            
+            # Output result as JSON
+            print(json.dumps(result, ensure_ascii=False))
+            
+        else:
+            # Return error if not enough arguments
+            error_result = {
+                'success': False,
+                'error': 'Missing required arguments',
+                'usage': 'python medical_ai_pipeline.py <image_path> [xray_type] [patient_info_json]'
+            }
+            print(json.dumps(error_result, ensure_ascii=False))
+            
+    except Exception as e:
+        # Return error result
+        error_result = {
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }
+        print(json.dumps(error_result, ensure_ascii=False))
