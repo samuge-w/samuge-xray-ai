@@ -3,6 +3,8 @@ const cors = require('cors')
 const multer = require('multer')
 const path = require('path')
 const sharp = require('sharp')
+const { spawn } = require('child_process')
+const fs = require('fs')
 
 // Import MONAI Service (ES6 module - will be handled by build process)
 // const MONAIService = require('./src/services/monaiService.js')
@@ -708,6 +710,180 @@ const getAvailableDatasetsForType = (xrayType) => {
   
   return datasets[xrayType] || datasets['general']
 }
+
+// Python MONAI Routes via Node.js subprocess
+app.post('/api/analyze-xray', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhuma imagem enviada' })
+    }
+
+    const { patientInfo = '{}', xrayType = 'general' } = req.body
+    
+    // Save image temporarily
+    const tempImagePath = path.join(__dirname, 'temp_image.jpg')
+    fs.writeFileSync(tempImagePath, req.file.buffer)
+    
+    // Call Python script via subprocess
+    const pythonProcess = spawn('python', [
+      path.join(__dirname, 'api', 'analyze-xray.py'),
+      tempImagePath,
+      patientInfo,
+      xrayType
+    ])
+    
+    let result = ''
+    let error = ''
+    
+    pythonProcess.stdout.on('data', (data) => {
+      result += data.toString()
+    })
+    
+    pythonProcess.stderr.on('data', (data) => {
+      error += data.toString()
+    })
+    
+    pythonProcess.on('close', (code) => {
+      // Clean up temp file
+      try {
+        fs.unlinkSync(tempImagePath)
+      } catch (e) {
+        console.log('Could not delete temp file:', e.message)
+      }
+      
+      if (code === 0) {
+        try {
+          const analysisResult = JSON.parse(result)
+          res.json({
+            success: true,
+            data: analysisResult
+          })
+        } catch (parseError) {
+          console.error('Error parsing Python result:', parseError)
+          res.status(500).json({ 
+            error: 'Erro ao processar resultado da análise',
+            details: parseError.message
+          })
+        }
+      } else {
+        console.error('Python process error:', error)
+        res.status(500).json({ 
+          error: 'Erro na análise Python',
+          details: error || 'Processo Python falhou'
+        })
+      }
+    })
+    
+  } catch (error) {
+    console.error('❌ Erro na análise X-ray:', error)
+    res.status(500).json({ 
+      error: 'Erro interno do servidor',
+      details: error.message 
+    })
+  }
+})
+
+// Python Auth Routes via Node.js subprocess
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body
+    
+    // Call Python auth script via subprocess
+    const pythonProcess = spawn('python', [
+      path.join(__dirname, 'api', 'auth-endpoints.py'),
+      'login',
+      username,
+      password
+    ])
+    
+    let result = ''
+    let error = ''
+    
+    pythonProcess.stdout.on('data', (data) => {
+      result += data.toString()
+    })
+    
+    pythonProcess.stderr.on('data', (data) => {
+      error += data.toString()
+    })
+    
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        try {
+          const authResult = JSON.parse(result)
+          res.json(authResult)
+        } catch (parseError) {
+          res.status(500).json({ 
+            error: 'Erro ao processar autenticação',
+            details: parseError.message
+          })
+        }
+      } else {
+        res.status(401).json({ 
+          error: 'Falha na autenticação',
+          details: error || 'Credenciais inválidas'
+        })
+      }
+    })
+    
+  } catch (error) {
+    console.error('❌ Erro na autenticação:', error)
+    res.status(500).json({ 
+      error: 'Erro interno do servidor',
+      details: error.message 
+    })
+  }
+})
+
+app.post('/api/auth/generate-api-key', async (req, res) => {
+  try {
+    const { token } = req.body
+    
+    // Call Python auth script via subprocess
+    const pythonProcess = spawn('python', [
+      path.join(__dirname, 'api', 'auth-endpoints.py'),
+      'generate-key',
+      token
+    ])
+    
+    let result = ''
+    let error = ''
+    
+    pythonProcess.stdout.on('data', (data) => {
+      result += data.toString()
+    })
+    
+    pythonProcess.stderr.on('data', (data) => {
+      error += data.toString()
+    })
+    
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        try {
+          const keyResult = JSON.parse(result)
+          res.json(keyResult)
+        } catch (parseError) {
+          res.status(500).json({ 
+            error: 'Erro ao gerar API key',
+            details: parseError.message
+          })
+        }
+      } else {
+        res.status(401).json({ 
+          error: 'Falha ao gerar API key',
+          details: error || 'Token inválido'
+        })
+      }
+    })
+    
+  } catch (error) {
+    console.error('❌ Erro ao gerar API key:', error)
+    res.status(500).json({ 
+      error: 'Erro interno do servidor',
+      details: error.message 
+    })
+  }
+})
 
 // Serve React app for all other routes
 app.get('*', (req, res) => {

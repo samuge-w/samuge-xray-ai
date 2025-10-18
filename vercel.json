@@ -1,24 +1,6 @@
 {
   "version": 2,
-  "functions": {
-    "api/analyze-xray.py": {
-      "runtime": "@vercel/python@3.1.0",
-      "maxDuration": 30
-    },
-    "api/auth-endpoints.py": {
-      "runtime": "@vercel/python@3.1.0",
-      "maxDuration": 30
-    }
-  },
   "routes": [
-    {
-      "src": "/api/analyze-xray",
-      "dest": "/api/analyze-xray.py"
-    },
-    {
-      "src": "/api/auth/(.*)",
-      "dest": "/api/auth-endpoints.py"
-    },
     {
       "src": "/api/(.*)",
       "dest": "/server.js"
@@ -29,8 +11,7 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production",
-    "PYTHON_VERSION": "3.11"
+    "NODE_ENV": "production"
   },
   "regions": ["iad1"],
   "framework": null,
