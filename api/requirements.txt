@@ -18,11 +18,11 @@ scikit-learn>=1.3.0
 matplotlib>=3.7.0
 pandas>=2.0.0
 
-# MedCLIP and Advanced Medical AI
-medclip>=0.1.0
-transformers>=4.30.0
+# MedCLIP and Advanced Medical AI (Python 3.11 compatible)
+medclip==0.0.3
+transformers>=4.30.0,<4.40.0
 efficientnet-pytorch>=0.7.1
-timm>=0.9.0
+timm>=0.9.0,<0.10.0
 
 # DeepSeek 3.1 Integration
 openai>=1.0.0
