@@ -78,3 +78,8 @@ pipProcess.stderr.on('data', (data) => {
 pipProcess.on('close', (code) => {
   console.log('🐍 Python version check exit code:', code);
 });
+
+
+
+
+

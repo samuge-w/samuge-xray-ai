@@ -9,8 +9,22 @@ services:
         value: production
       - key: PORT
         value: 10000
+      - key: PYTHON_PATH
+        value: /app/venv/bin/python
+      - key: HF_HOME
+        value: /app/.cache/hf
+      - key: TRANSFORMERS_CACHE
+        value: /app/.cache/hf
+      - key: TORCH_HOME
+        value: /app/.cache/torch
+      - key: HF_HUB_DISABLE_TELEMETRY
+        value: "1"
+      - key: NODE_VERSION
+        value: "18.18.0"
     healthCheckPath: /api/health
     autoDeploy: true
+    maxShutdownDelaySeconds: 60
+
 
 
 

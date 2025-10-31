@@ -1,0 +1,59 @@
+MedCLIP not available, using fallback
+================================================================================
+🚀 STARTING MODEL INITIALIZATION
+================================================================================
+📊 MEDCLIP_AVAILABLE: False
+📊 OPENCLIP_AVAILABLE: True
+📊 MONAI_AVAILABLE: True
+📊 TORCH_AVAILABLE: True
+⚠️ MedCLIP package not available
+🔄 Initializing MONAI transforms...
+✅ MONAI transforms initialized successfully
+================================================================================
+✅ MODEL INITIALIZATION COMPLETE
+   MedCLIP Model: Not Loaded
+   MONAI Transforms: Loaded
+================================================================================
+DEBUG: Python script started
+DEBUG: Arguments received: 4
+DEBUG: Arg 0: api/medical_ai_pipeline.py...
+DEBUG: Arg 1: test_xray.png...
+DEBUG: Arg 2: chest...
+DEBUG: Arg 3: {"age": 45}...
+DEBUG: Image path: test_xray.png
+DEBUG: X-ray type: chest
+DEBUG: Patient info string: {"age": 45}...
+DEBUG: Image file size: 49846 bytes
+DEBUG: Patient info parsed successfully: {'age': 45}
+DEBUG: Image loaded successfully: (224, 224), mode: L
+DEBUG: Starting medical analysis...
+DEBUG: Starting complete analysis for chest X-ray
+DEBUG: Patient info: {'age': 45}
+DEBUG: Step 1 - Preprocessing image...
+DEBUG: Image preprocessing completed
+DEBUG: Step 2 - Running MedCLIP analysis...
+================================================================================
+🔬 STARTING MEDCLIP ANALYSIS
+================================================================================
+🔍 Checking MedCLIP availability...
+   MEDCLIP_AVAILABLE: False
+   self.medclip_model: False
+⚠️ MedCLIP not available, trying OpenCLIP...
+🔍 Checking OpenCLIP availability: True
+✅ OpenCLIP available, attempting to load model...
+DEBUG: Attempting to load Medical CLIP via OpenCLIP...
+DEBUG: OpenCLIP model loaded successfully
+DEBUG: Medical CLIP analysis successful. Primary: Tuberculosis, Confidence: 0.30
+DEBUG: MedCLIP analysis completed: Tuberculosis
+DEBUG: Step 3 - Generating medical report...
+================================================================================
+📝 GENERATING MEDICAL REPORT WITH DEEPSEEK
+================================================================================
+🔑 API Key status: NOT FOUND
+❌ DEEPSEEK_API_KEY not found in environment, using fallback report
+DEBUG: Medical report generated
+DEBUG: Step 4 - Generating heatmap...
+DEBUG: Heatmap generated
+DEBUG: Step 5 - Compiling results...
+DEBUG: Analysis pipeline completed successfully
+DEBUG: Analysis completed, result keys: ['success', 'timestamp', 'xray_type', 'patient_info', 'diagnosis', 'medical_report', 'visualization', 'differential_diagnoses', 'clinical_recommendations', 'confidence_metrics', 'aiProvider', 'framework']
