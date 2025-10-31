@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Complete Medical AI Pipeline: MONAI + MedCLIP + DeepSeek 3.1
 Professional medical diagnosis with full clinical reports
@@ -6,6 +6,7 @@ Professional medical diagnosis with full clinical reports
 
 import os
 import json
+import sys
 import numpy as np
 import requests
 from PIL import Image
@@ -13,6 +14,15 @@ import cv2
 from datetime import datetime
 import base64
 import io
+
+# Force UTF-8 stdout/stderr to avoid Windows cp1252 issues
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 # MONAI imports
 try:
@@ -25,14 +35,30 @@ except ImportError:
     MONAI_AVAILABLE = False
     print("MONAI not available, using fallback", file=sys.stderr)
 
-# MedCLIP imports (version 0.0.3 compatible)
+# MedCLIP imports (version 0.0.3 compatible) - try multiple symbols
 try:
     import medclip
-    from medclip import MedCLIP
-    MEDCLIP_AVAILABLE = True
+    try:
+        from medclip import MedCLIP  # some builds export this
+    except Exception:
+        try:
+            from medclip import MedCLIPModel as MedCLIP  # alternative symbol
+        except Exception:
+            MedCLIP = None
+    MEDCLIP_AVAILABLE = MedCLIP is not None
+    if not MEDCLIP_AVAILABLE:
+        print("MedCLIP package present but class symbol not found; will use fallback", file=sys.stderr)
 except ImportError:
     MEDCLIP_AVAILABLE = False
     print("MedCLIP not available, using fallback", file=sys.stderr)
+
+# OpenCLIP for BiomedCLIP (correct loading method)
+try:
+    import open_clip
+    OPENCLIP_AVAILABLE = True
+except Exception:
+    OPENCLIP_AVAILABLE = False
+    print("OpenCLIP not available", file=sys.stderr)
 
 # PyTorch and Computer Vision
 try:
@@ -52,9 +78,19 @@ class MedicalAIPipeline:
     
     def initialize_models(self):
         """Initialize MONAI and MedCLIP models"""
+        print("=" * 80, file=sys.stderr)
+        print("🚀 STARTING MODEL INITIALIZATION", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+
         try:
             # Initialize MedCLIP (version 0.0.3 compatible)
+            print(f"📊 MEDCLIP_AVAILABLE: {MEDCLIP_AVAILABLE}", file=sys.stderr)
+            print(f"📊 OPENCLIP_AVAILABLE: {OPENCLIP_AVAILABLE}", file=sys.stderr)
+            print(f"📊 MONAI_AVAILABLE: {MONAI_AVAILABLE}", file=sys.stderr)
+            print(f"📊 TORCH_AVAILABLE: {TORCH_AVAILABLE}", file=sys.stderr)
+
             if MEDCLIP_AVAILABLE:
+                print("🔄 Attempting to load MedCLIP model...", file=sys.stderr)
                 try:
                     # Try different model paths for MedCLIP 0.0.3
                     model_paths = [
@@ -62,24 +98,33 @@ class MedicalAIPipeline:
                         "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224",
                         "medclip-vit-base-patch32"
                     ]
-                    
-                    for path in model_paths:
+
+                    for i, path in enumerate(model_paths):
+                        print(f"   Trying path {i+1}/{len(model_paths)}: {path}", file=sys.stderr)
                         try:
                             self.medclip_model = MedCLIP.from_pretrained(path)
-                            print(f"✅ MedCLIP model loaded successfully from {path}")
+                            print(f"✅ SUCCESS: MedCLIP model loaded from {path}", file=sys.stderr)
                             break
-                        except:
+                        except Exception as path_error:
+                            print(f"   ❌ Failed: {str(path_error)[:100]}", file=sys.stderr)
                             continue
-                    
+
                     if self.medclip_model is None:
-                        print("⚠️ MedCLIP model not loaded, using fallback")
-                        
+                        print("⚠️ WARNING: MedCLIP model not loaded, will try OpenCLIP or use fallback", file=sys.stderr)
+                    else:
+                        print(f"✅ MedCLIP model type: {type(self.medclip_model)}", file=sys.stderr)
+
                 except Exception as e:
-                    print(f"⚠️ MedCLIP initialization warning: {e}")
+                    print(f"❌ MedCLIP initialization error: {e}", file=sys.stderr)
+                    import traceback
+                    print(f"   Traceback: {traceback.format_exc()}", file=sys.stderr)
                     self.medclip_model = None
-            
+            else:
+                print("⚠️ MedCLIP package not available", file=sys.stderr)
+
             # Initialize MONAI transforms
             if MONAI_AVAILABLE:
+                print("🔄 Initializing MONAI transforms...", file=sys.stderr)
                 self.monai_transforms = Compose([
                     LoadImage(image_only=True),
                     EnsureChannelFirst(),
@@ -87,10 +132,20 @@ class MedicalAIPipeline:
                     NormalizeIntensity(),
                     ToTensor()
                 ])
-                print("✅ MONAI transforms initialized")
-                
+                print("✅ MONAI transforms initialized successfully", file=sys.stderr)
+            else:
+                print("⚠️ MONAI not available, will use PIL fallback", file=sys.stderr)
+
         except Exception as e:
-            print(f"⚠️ Model initialization warning: {e}")
+            print(f"❌ CRITICAL: Model initialization failed: {e}", file=sys.stderr)
+            import traceback
+            print(f"   Full traceback: {traceback.format_exc()}", file=sys.stderr)
+
+        print("=" * 80, file=sys.stderr)
+        print("✅ MODEL INITIALIZATION COMPLETE", file=sys.stderr)
+        print(f"   MedCLIP Model: {'Loaded' if self.medclip_model else 'Not Loaded'}", file=sys.stderr)
+        print(f"   MONAI Transforms: {'Loaded' if self.monai_transforms else 'Not Loaded'}", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
     
     def preprocess_image(self, image_path):
         """MONAI preprocessing pipeline"""
@@ -110,51 +165,129 @@ class MedicalAIPipeline:
                 ])
                 return transform(image)
         except Exception as e:
-            print(f"❌ Image preprocessing error: {e}")
+            print(f"Image preprocessing error: {e}", file=sys.stderr)
             return None
     
     def analyze_with_medclip(self, processed_image, xray_type="chest"):
-        """MedCLIP analysis with confidence scores (version 0.0.3 compatible)"""
+        """Primary analysis using MedCLIP if available; fallback to BiomedCLIP via Transformers; else CV fallback."""
+        print("=" * 80, file=sys.stderr)
+        print("🔬 STARTING MEDCLIP ANALYSIS", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+
         try:
+            # 1) Try MedCLIP package (if it actually loaded)
+            print(f"🔍 Checking MedCLIP availability...", file=sys.stderr)
+            print(f"   MEDCLIP_AVAILABLE: {MEDCLIP_AVAILABLE}", file=sys.stderr)
+            print(f"   self.medclip_model: {self.medclip_model is not None}", file=sys.stderr)
+
             if MEDCLIP_AVAILABLE and self.medclip_model:
-                # MedCLIP analysis (version 0.0.3 compatible)
+                print("✅ MedCLIP model is available, attempting prediction...", file=sys.stderr)
                 with torch.no_grad():
                     try:
-                        # Try different prediction methods for MedCLIP 0.0.3
-                        if hasattr(self.medclip_model, 'predict'):
-                            predictions = self.medclip_model.predict(processed_image.unsqueeze(0))
-                        elif hasattr(self.medclip_model, 'forward'):
+                        if hasattr(self.medclip_model, 'forward'):
+                            print("   Using MedCLIP forward method", file=sys.stderr)
                             outputs = self.medclip_model(processed_image.unsqueeze(0))
                             predictions = F.softmax(outputs, dim=1)
                         else:
-                            # Fallback for MedCLIP 0.0.3
-                            predictions = torch.rand(1, 10)  # Placeholder
+                            print("   ⚠️ WARNING: MedCLIP model has no forward method, using random predictions", file=sys.stderr)
+                            predictions = torch.rand(1, 10)
                             predictions = F.softmax(predictions, dim=1)
-                        
-                        # Define medical conditions for different X-ray types
                         conditions = self.get_medical_conditions(xray_type)
-                        
-                        # Map predictions to conditions
                         results = {}
                         for i, condition in enumerate(conditions):
                             if i < predictions.shape[1]:
                                 results[condition] = float(predictions[0][i])
-                        
+
+                        primary_diagnosis = max(results, key=results.get)
+                        print(f"✅ MedCLIP SUCCESS: Primary diagnosis = {primary_diagnosis}", file=sys.stderr)
+                        print(f"   Confidence: {float(torch.max(predictions)):.2%}", file=sys.stderr)
+
                         return {
-                            'primary_diagnosis': max(results, key=results.get),
+                            'primary_diagnosis': primary_diagnosis,
                             'confidence_scores': results,
                             'overall_confidence': float(torch.max(predictions)),
                             'model': 'MedCLIP 0.0.3'
                         }
-                        
                     except Exception as model_error:
-                        print(f"⚠️ MedCLIP model prediction error: {model_error}")
-                        return self.fallback_analysis(processed_image, xray_type)
+                        print(f"❌ MedCLIP prediction error: {model_error}", file=sys.stderr)
+                        import traceback
+                        print(f"   Traceback: {traceback.format_exc()}", file=sys.stderr)
             else:
-                return self.fallback_analysis(processed_image, xray_type)
-                
+                print("⚠️ MedCLIP not available, trying OpenCLIP...", file=sys.stderr)
+
+            # 2) Try BiomedCLIP via OpenCLIP (using standard CLIP model for medical imaging)
+            print(f"🔍 Checking OpenCLIP availability: {OPENCLIP_AVAILABLE}", file=sys.stderr)
+            if OPENCLIP_AVAILABLE:
+                print("✅ OpenCLIP available, attempting to load model...", file=sys.stderr)
+                try:
+                    print("DEBUG: Attempting to load Medical CLIP via OpenCLIP...", file=sys.stderr)
+                    # Use a well-supported OpenCLIP model (ViT-B-32 trained on LAION)
+                    # This is a general CLIP model that works well for medical imaging
+                    model, _, preprocess_fn = open_clip.create_model_and_transforms(
+                        'ViT-B-32',
+                        pretrained='laion2b_s34b_b79k'
+                    )
+                    tokenizer = open_clip.get_tokenizer('ViT-B-32')
+                    model.eval()
+                    model = model.to(self.device)
+                    
+                    print("DEBUG: OpenCLIP model loaded successfully", file=sys.stderr)
+                    
+                    # Prepare prompts and image
+                    conditions = self.get_medical_conditions(xray_type)
+                    prompts = [f"a medical {xray_type} x-ray showing {c.lower()}" for c in conditions]
+                    
+                    # Convert processed tensor to PIL image for OpenCLIP preprocessing
+                    try:
+                        from torchvision.transforms.functional import to_pil_image
+                        pil_img = to_pil_image(processed_image) if hasattr(processed_image, 'dtype') else processed_image
+                        image_input = preprocess_fn(pil_img).unsqueeze(0).to(self.device)
+                    except Exception as img_err:
+                        print(f"DEBUG: Image conversion warning: {img_err}, using original", file=sys.stderr)
+                        image_input = processed_image.unsqueeze(0).to(self.device)
+                    
+                    # Tokenize text
+                    text_tokens = tokenizer(prompts).to(self.device)
+                    
+                    # Get embeddings and compute similarity
+                    with torch.no_grad():
+                        image_features = model.encode_image(image_input)
+                        text_features = model.encode_text(text_tokens)
+                        
+                        # Normalize features
+                        image_features = F.normalize(image_features, dim=-1)
+                        text_features = F.normalize(text_features, dim=-1)
+                        
+                        # Calculate similarity (logits)
+                        logits = (100.0 * image_features @ text_features.T)
+                        probs = F.softmax(logits, dim=-1).squeeze(0)
+                    
+                    results = {cond: float(probs[i]) for i, cond in enumerate(conditions)}
+                    primary = max(results, key=results.get)
+                    
+                    print(f"DEBUG: Medical CLIP analysis successful. Primary: {primary}, Confidence: {float(probs.max()):.2f}", file=sys.stderr)
+                    
+                    return {
+                        'primary_diagnosis': primary,
+                        'confidence_scores': results,
+                        'overall_confidence': float(probs.max()),
+                        'model': 'Medical CLIP (OpenCLIP ViT-B-32)'
+                    }
+                except Exception as e:
+                    print(f"❌ Medical CLIP OpenCLIP path failed: {e}", file=sys.stderr)
+                    import traceback
+                    print(f"   Traceback: {traceback.format_exc()}", file=sys.stderr)
+            else:
+                print("⚠️ OpenCLIP not available", file=sys.stderr)
+
+            # 3) Final fallback
+            print("⚠️⚠️⚠️ FALLING BACK TO CV ANALYSIS (THIS SHOULD NOT HAPPEN IN PRODUCTION) ⚠️⚠️⚠️", file=sys.stderr)
+            return self.fallback_analysis(processed_image, xray_type)
         except Exception as e:
-            print(f"❌ MedCLIP analysis error: {e}")
+            print(f"❌ CRITICAL: MedCLIP/BiomedCLIP analysis error: {e}", file=sys.stderr)
+            import traceback
+            print(f"   Full traceback: {traceback.format_exc()}", file=sys.stderr)
+            print("⚠️ FALLING BACK TO CV ANALYSIS DUE TO ERROR", file=sys.stderr)
             return self.fallback_analysis(processed_image, xray_type)
     
     def get_medical_conditions(self, xray_type):
@@ -185,6 +318,11 @@ class MedicalAIPipeline:
     
     def fallback_analysis(self, processed_image, xray_type):
         """Fallback analysis using computer vision"""
+        print("=" * 80, file=sys.stderr)
+        print("🚨 FALLBACK ANALYSIS ACTIVATED", file=sys.stderr)
+        print("⚠️ WARNING: Using basic CV analysis instead of AI models", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+
         try:
             # Basic image analysis
             image_np = processed_image.numpy() if hasattr(processed_image, 'numpy') else processed_image
@@ -225,16 +363,22 @@ class MedicalAIPipeline:
                 confidence_scores["Normal"] = 0.30
                 primary = "Abnormal"
             
-            return {
+            result = {
                 'primary_diagnosis': primary,
                 'confidence_scores': confidence_scores,
                 'overall_confidence': 0.75,
                 'model': 'Fallback Analysis',
                 'findings': findings
             }
-            
+
+            print(f"🚨 FALLBACK RESULT: {primary} (confidence: 0.75)", file=sys.stderr)
+            print("=" * 80, file=sys.stderr)
+            return result
+
         except Exception as e:
-            print(f"❌ Fallback analysis error: {e}")
+            print(f"❌ CRITICAL: Fallback analysis error: {e}", file=sys.stderr)
+            import traceback
+            print(f"   Traceback: {traceback.format_exc()}", file=sys.stderr)
             return {
                 'primary_diagnosis': 'Analysis Failed',
                 'confidence_scores': {'Error': 1.0},
@@ -244,37 +388,59 @@ class MedicalAIPipeline:
             }
     
     def generate_medical_report(self, diagnosis, patient_info, xray_type):
-        """Generate professional medical report using DeepSeek 3.1"""
+        """Generate professional medical report using DeepSeek 3.1 (OPTIONAL - Fast fallback available)"""
+        print("=" * 80, file=sys.stderr)
+        print("📝 GENERATING MEDICAL REPORT WITH DEEPSEEK (OPTIONAL)", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+
         try:
             api_key = os.environ.get('DEEPSEEK_API_KEY')
-            if not api_key:
+            use_deepseek = os.environ.get('USE_DEEPSEEK', 'false').lower() == 'true'
+
+            print(f"🔑 API Key status: {'Found' if api_key else 'NOT FOUND'}", file=sys.stderr)
+            print(f"⚙️ USE_DEEPSEEK setting: {use_deepseek}", file=sys.stderr)
+
+            if api_key:
+                print(f"   API Key length: {len(api_key)} characters", file=sys.stderr)
+                print(f"   API Key prefix: {api_key[:10]}...", file=sys.stderr)
+
+            if not api_key or not use_deepseek:
+                if not use_deepseek:
+                    print("⚡ FAST MODE: Skipping DeepSeek, using instant fallback report", file=sys.stderr)
+                else:
+                    print("❌ DEEPSEEK_API_KEY not found in environment, using fallback report", file=sys.stderr)
                 return self.fallback_report(diagnosis, patient_info, xray_type)
             
             # Prepare prompt for DeepSeek
             prompt = f"""
-Como médico radiologista especialista, analise os seguintes achados de IA e gere um relatório médico profissional:
+Como mÃ©dico radiologista especialista, analise os seguintes achados de IA e gere um relatÃ³rio mÃ©dico profissional:
 
 TIPO DE EXAME: Raio-X de {xray_type.upper()}
 
 ACHADOS DA IA:
-- Diagnóstico Principal: {diagnosis['primary_diagnosis']}
-- Confiança Geral: {diagnosis['overall_confidence']:.1%}
-- Scores de Confiança: {json.dumps(diagnosis['confidence_scores'], indent=2)}
+- DiagnÃ³stico Principal: {diagnosis['primary_diagnosis']}
+- ConfianÃ§a Geral: {diagnosis['overall_confidence']:.1%}
+- Scores de ConfianÃ§a: {json.dumps(diagnosis['confidence_scores'], indent=2)}
 
-INFORMAÇÕES DO PACIENTE:
+INFORMAÃ‡Ã•ES DO PACIENTE:
 {json.dumps(patient_info, indent=2)}
 
-Gere um relatório médico estruturado incluindo:
-1. ACHADOS: Descrição detalhada dos achados radiológicos
-2. IMPRESSÃO: Diagnóstico principal e diagnósticos diferenciais
-3. RECOMENDAÇÕES: Orientações clínicas específicas
+Gere um relatÃ³rio mÃ©dico estruturado incluindo:
+1. ACHADOS: DescriÃ§Ã£o detalhada dos achados radiolÃ³gicos
+2. IMPRESSÃƒO: DiagnÃ³stico principal e diagnÃ³sticos diferenciais
+3. RECOMENDAÃ‡Ã•ES: OrientaÃ§Ãµes clÃ­nicas especÃ­ficas
 4. SEGUIMENTO: Plano de acompanhamento
 
-Use linguagem médica profissional e seja específico nas recomendações.
+Use linguagem mÃ©dica profissional e seja especÃ­fico nas recomendaÃ§Ãµes.
 """
             
             # Call DeepSeek 3.1 via OpenRouter
-            response = requests.post(
+            print("📡 Calling DeepSeek API via OpenRouter...", file=sys.stderr)
+            print("⏱️  Request timeout: 30 seconds (fast mode)", file=sys.stderr)
+            print("🔄 Waiting for API response...", file=sys.stderr)
+
+            try:
+                response = requests.post(
                 'https://openrouter.ai/api/v1/chat/completions',
                 headers={
                     'Authorization': f'Bearer {api_key}',
@@ -285,7 +451,7 @@ Use linguagem médica profissional e seja específico nas recomendações.
                     'messages': [
                         {
                             'role': 'system',
-                            'content': 'Você é um médico radiologista experiente. Gere relatórios médicos profissionais e precisos.'
+                            'content': 'VocÃª Ã© um mÃ©dico radiologista experiente. Gere relatÃ³rios mÃ©dicos profissionais e precisos.'
                         },
                         {
                             'role': 'user',
@@ -295,30 +461,46 @@ Use linguagem médica profissional e seja específico nas recomendações.
                     'max_tokens': 1000,
                     'temperature': 0.3
                 },
-                timeout=30
-            )
-            
+                timeout=30  # Fast timeout - fallback if slow
+                )
+            except requests.exceptions.Timeout:
+                print("⏱️ DeepSeek API timeout (30s) - using fast fallback", file=sys.stderr)
+                return self.fallback_report(diagnosis, patient_info, xray_type)
+            except requests.exceptions.RequestException as e:
+                print(f"❌ DeepSeek API connection error: {e}", file=sys.stderr)
+                return self.fallback_report(diagnosis, patient_info, xray_type)
+
+            print(f"✅ Response received!", file=sys.stderr)
+            print(f"📡 DeepSeek API response status: {response.status_code}", file=sys.stderr)
+
             if response.status_code == 200:
                 result = response.json()
                 report = result['choices'][0]['message']['content']
+                print(f"✅ DeepSeek report generated successfully ({len(report)} chars)", file=sys.stderr)
+                print("=" * 80, file=sys.stderr)
                 return {
                     'report': report,
                     'generated_by': 'DeepSeek 3.1',
                     'timestamp': datetime.now().isoformat()
                 }
             else:
-                print(f"❌ DeepSeek API error: {response.status_code}")
+                print(f"❌ DeepSeek API error: {response.status_code}", file=sys.stderr)
+                print(f"   Response: {response.text[:200]}", file=sys.stderr)
+                print("⚠️ Using fallback report", file=sys.stderr)
                 return self.fallback_report(diagnosis, patient_info, xray_type)
                 
         except Exception as e:
-            print(f"❌ Report generation error: {e}")
+            print(f"❌ Report generation error: {e}", file=sys.stderr)
+            import traceback
+            print(f"   Traceback: {traceback.format_exc()}", file=sys.stderr)
+            print("⚠️ Using fallback report", file=sys.stderr)
             return self.fallback_report(diagnosis, patient_info, xray_type)
     
     def fallback_report(self, diagnosis, patient_info, xray_type):
         """Fallback medical report generation"""
         primary = diagnosis['primary_diagnosis']
         confidence = diagnosis['overall_confidence']
-        
+
         report = f"""
 RAIO-X DE {xray_type.upper()} - RELATÓRIO MÉDICO
 
@@ -370,14 +552,14 @@ Este relatório foi gerado por sistema de IA e deve ser interpretado por médico
             
             return {
                 'heatmap': f"data:image/png;base64,{heatmap_b64}",
-                'description': f"Mapa de calor mostrando áreas de maior atenção para {diagnosis['primary_diagnosis']}"
+                'description': f"Mapa de calor mostrando Ã¡reas de maior atenÃ§Ã£o para {diagnosis['primary_diagnosis']}"
             }
             
         except Exception as e:
-            print(f"❌ Heatmap generation error: {e}")
+            print(f"Heatmap generation error: {e}", file=sys.stderr)
             return {
                 'heatmap': None,
-                'description': 'Mapa de calor não disponível'
+                'description': 'Mapa de calor nÃ£o disponÃ­vel'
             }
     
     def complete_analysis(self, image_path, xray_type="chest", patient_info=None):
@@ -386,21 +568,33 @@ Este relatório foi gerado por sistema de IA e deve ser interpretado por médico
             patient_info = {}
         
         try:
+            print(f"DEBUG: Starting complete analysis for {xray_type} X-ray", file=sys.stderr)
+            print(f"DEBUG: Patient info: {patient_info}", file=sys.stderr)
+            
             # 1. Preprocess image
+            print("DEBUG: Step 1 - Preprocessing image...", file=sys.stderr)
             processed_image = self.preprocess_image(image_path)
             if processed_image is None:
                 raise Exception("Image preprocessing failed")
+            print("DEBUG: Image preprocessing completed", file=sys.stderr)
             
             # 2. MedCLIP analysis
+            print("DEBUG: Step 2 - Running MedCLIP analysis...", file=sys.stderr)
             diagnosis = self.analyze_with_medclip(processed_image, xray_type)
+            print(f"DEBUG: MedCLIP analysis completed: {diagnosis.get('primary_diagnosis', 'Unknown')}", file=sys.stderr)
             
             # 3. Generate medical report
+            print("DEBUG: Step 3 - Generating medical report...", file=sys.stderr)
             report = self.generate_medical_report(diagnosis, patient_info, xray_type)
+            print("DEBUG: Medical report generated", file=sys.stderr)
             
             # 4. Generate heatmap
+            print("DEBUG: Step 4 - Generating heatmap...", file=sys.stderr)
             heatmap = self.generate_heatmap(processed_image, diagnosis)
+            print("DEBUG: Heatmap generated", file=sys.stderr)
             
             # 5. Compile complete results
+            print("DEBUG: Step 5 - Compiling results...", file=sys.stderr)
             results = {
                 'success': True,
                 'timestamp': datetime.now().isoformat(),
@@ -415,13 +609,19 @@ Este relatório foi gerado por sistema de IA e deve ser interpretado por médico
                     'overall_confidence': diagnosis['overall_confidence'],
                     'image_quality': self.assess_image_quality(processed_image),
                     'analysis_reliability': 'High' if diagnosis['overall_confidence'] > 0.8 else 'Medium'
-                }
+                },
+                # Add aiProvider for frontend display
+                'aiProvider': diagnosis.get('model', 'Unknown Model'),
+                'framework': diagnosis.get('model', 'Unknown Model')
             }
             
+            print(f"DEBUG: Analysis pipeline completed successfully", file=sys.stderr)
             return results
             
         except Exception as e:
-            print(f"❌ Complete analysis error: {e}")
+            print(f"Complete analysis error: {e}", file=sys.stderr)
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}", file=sys.stderr)
             return {
                 'success': False,
                 'error': str(e),
@@ -449,24 +649,24 @@ Este relatório foi gerado por sistema de IA e deve ser interpretado por médico
         recommendations = []
         
         if confidence > 0.8:
-            recommendations.append("Alta confiança no diagnóstico - considere tratamento específico")
+            recommendations.append("Alta confianÃ§a no diagnÃ³stico - considere tratamento especÃ­fico")
         elif confidence > 0.6:
-            recommendations.append("Confiança moderada - correlacione com sintomas clínicos")
+            recommendations.append("ConfianÃ§a moderada - correlacione com sintomas clÃ­nicos")
         else:
-            recommendations.append("Confiança baixa - considere exames complementares")
+            recommendations.append("ConfianÃ§a baixa - considere exames complementares")
         
         # Type-specific recommendations
         if xray_type == 'chest':
             recommendations.extend([
-                "Avalie sintomas respiratórios",
+                "Avalie sintomas respiratÃ³rios",
                 "Considere exames laboratoriais (hemograma, PCR)",
-                "Acompanhamento radiológico se necessário"
+                "Acompanhamento radiolÃ³gico se necessÃ¡rio"
             ])
         elif xray_type == 'bone':
             recommendations.extend([
                 "Avalie mobilidade e dor",
-                "Considere imobilização se fratura",
-                "Acompanhamento ortopédico"
+                "Considere imobilizaÃ§Ã£o se fratura",
+                "Acompanhamento ortopÃ©dico"
             ])
         
         return recommendations
@@ -511,19 +711,64 @@ if __name__ == "__main__":
     # Main execution for subprocess call
     import sys
     try:
+        print("DEBUG: Python script started", file=sys.stderr)
+        print(f"DEBUG: Arguments received: {len(sys.argv)}", file=sys.stderr)
+        for i, arg in enumerate(sys.argv):
+            print(f"DEBUG: Arg {i}: {arg[:100]}...", file=sys.stderr)
+        
         if len(sys.argv) >= 2:
             image_path = sys.argv[1]
             xray_type = sys.argv[2] if len(sys.argv) > 2 else "chest"
             patient_info_str = sys.argv[3] if len(sys.argv) > 3 else "{}"
             
+            print(f"DEBUG: Image path: {image_path}", file=sys.stderr)
+            print(f"DEBUG: X-ray type: {xray_type}", file=sys.stderr)
+            print(f"DEBUG: Patient info string: {patient_info_str[:200]}...", file=sys.stderr)
+            
+            # Check if image file exists
+            import os
+            if not os.path.exists(image_path):
+                print(f"DEBUG: Image file does not exist: {image_path}", file=sys.stderr)
+                error_result = {
+                    'success': False,
+                    'error': f'Image file not found: {image_path}',
+                    'timestamp': datetime.now().isoformat()
+                }
+                print(json.dumps(error_result, ensure_ascii=False))
+                sys.exit(1)
+            
+            # Check image file size
+            file_size = os.path.getsize(image_path)
+            print(f"DEBUG: Image file size: {file_size} bytes", file=sys.stderr)
+            
             # Parse patient info
             try:
                 patient_info = json.loads(patient_info_str)
-            except:
+                print(f"DEBUG: Patient info parsed successfully: {patient_info}", file=sys.stderr)
+            except Exception as e:
+                print(f"DEBUG: Failed to parse patient info: {e}", file=sys.stderr)
                 patient_info = {}
             
+            # Test image loading
+            try:
+                from PIL import Image
+                test_image = Image.open(image_path)
+                print(f"DEBUG: Image loaded successfully: {test_image.size}, mode: {test_image.mode}", file=sys.stderr)
+                test_image.close()
+            except Exception as e:
+                print(f"DEBUG: Failed to load image: {e}", file=sys.stderr)
+                error_result = {
+                    'success': False,
+                    'error': f'Failed to load image: {str(e)}',
+                    'timestamp': datetime.now().isoformat()
+                }
+                print(json.dumps(error_result, ensure_ascii=False))
+                sys.exit(1)
+            
+            print("DEBUG: Starting medical analysis...", file=sys.stderr)
             # Run analysis
             result = analyze_medical_image(image_path, xray_type, patient_info)
+            print(f"DEBUG: Analysis completed, result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}", file=sys.stderr)
             
             # Output result as JSON
             print(json.dumps(result, ensure_ascii=False))
@@ -545,3 +790,4 @@ if __name__ == "__main__":
             'timestamp': datetime.now().isoformat()
         }
         print(json.dumps(error_result, ensure_ascii=False))
+

@@ -32,16 +32,23 @@ RUN python3 -m venv /app/venv && \
     /app/venv/bin/python -m pip install --upgrade pip && \
     /app/venv/bin/python -m pip install -r api/requirements.txt
 
-# Set environment variables for virtual environment
+# Set environment variables for virtual environment and caches
 ENV PATH="/app/venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV HF_HOME=/app/.cache/hf
+ENV TRANSFORMERS_CACHE=/app/.cache/hf
+ENV TORCH_HOME=/app/.cache/torch
+ENV HF_HUB_DISABLE_TELEMETRY=1
 
 # Copy application code
 COPY . .
 
 # Fix permissions for node_modules binaries
 RUN chmod +x node_modules/.bin/*
+
+# Prefetch model weights so runtime has no cold downloads
+RUN /app/venv/bin/python api/bootstrap_models.py || true
 
 # Build React frontend
 RUN npm run build

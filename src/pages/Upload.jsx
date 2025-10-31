@@ -73,29 +73,26 @@ const Upload = () => {
     setIsAnalyzing(true)
     
     try {
-      // Convert image to base64
-      const file = uploadedFiles[0].file
-      const base64 = await fileToBase64(file)
+      // Prepare FormData for multipart upload (Context7 Multer standard)
+      const formData = new FormData()
       
-      // Prepare request payload
-      const payload = {
-        image: base64,
-        xrayType: xrayType,
-        patientInfo: {
-          age: parseInt(patientInfo.age) || 0,
-          gender: patientInfo.gender,
-          smoking: patientInfo.smoking,
-          diabetes: patientInfo.diabetes,
-          hypertension: patientInfo.hypertension,
-          medicalHistory: patientInfo.medicalHistory,
-          symptoms: symptoms
-        }
-      }
+      // Add image file (Context7 Multer expects 'image' field name)
+      formData.append('image', uploadedFiles[0].file)
+      
+      // Add other data as form fields
+      formData.append('xrayType', xrayType)
+      formData.append('patientInfo', JSON.stringify({
+        age: parseInt(patientInfo.age) || 0,
+        gender: patientInfo.gender,
+        smoking: patientInfo.smoking,
+        diabetes: patientInfo.diabetes,
+        hypertension: patientInfo.hypertension,
+        medicalHistory: patientInfo.medicalHistory,
+        symptoms: symptoms
+      }))
 
       // Prepare headers with authentication if available
-      const headers = {
-        'Content-Type': 'application/json',
-      }
+      const headers = {}
       
       // Add authentication header if available
       const token = localStorage.getItem('auth_token')
@@ -107,11 +104,11 @@ const Upload = () => {
         headers['Authorization'] = `ApiKey ${apiKey}`
       }
 
-      // Call the MONAI API
+      // Call the MONAI API with FormData (Context7 Multer compatible)
       const response = await fetch('/api/analyze-xray', {
         method: 'POST',
         headers,
-        body: JSON.stringify(payload)
+        body: formData
       })
 
       if (!response.ok) {
@@ -120,20 +117,25 @@ const Upload = () => {
 
       const result = await response.json()
       
-      // Transform MONAI result to frontend format
+      // Transform MONAI result to frontend format (Context7 + Render MCP compatible)
       const transformedResult = {
-        findings: result.findings.map((finding, index) => ({
+        findings: (result.data?.findings || result.findings || []).map((finding, index) => ({
           condition: `Achado ${index + 1}`,
-          description: finding,
-          severity: 'normal',
-          confidence: Math.round(result.confidence * 100)
+          description: typeof finding === 'string' ? finding : finding.description || finding,
+          severity: finding.severity || 'normal',
+          confidence: finding.confidence || Math.round((result.data?.confidence || result.confidence || 0.75) * 100)
         })),
-        recommendations: result.recommendations,
-        riskFactors: result.riskFactors,
-        confidence: Math.round(result.confidence * 100),
-        aiProvider: result.framework || 'MONAI',
-        xrayType: result.xrayType,
-        timestamp: result.timestamp
+        recommendations: result.data?.recommendations || result.recommendations || result.clinical_recommendations || ['Avaliação médica complementar recomendada'],
+        riskFactors: result.data?.riskFactors || result.riskFactors || ['Fatores de risco não identificados'],
+        medicalReport: result.data?.medical_report?.report || result.medical_report?.report || null,
+        medicalReportBy: result.data?.medical_report?.generated_by || result.medical_report?.generated_by || null,
+        differentialDiagnoses: result.data?.differential_diagnoses || result.differential_diagnoses || [],
+        diagnosis: result.data?.diagnosis || result.diagnosis || null,
+        heatmap: result.data?.visualization?.heatmap || result.visualization?.heatmap || null,
+        confidence: Math.round((result.data?.confidence || result.diagnosis?.overall_confidence * 100 || result.confidence || 0.75) * 100),
+        aiProvider: result.data?.aiProvider || result.framework || result.aiProvider || 'MONAI',
+        xrayType: result.data?.xrayType || result.xrayType || xrayType,
+        timestamp: result.data?.timestamp || result.timestamp || new Date().toISOString()
       }
       
       setAnalysisResult(transformedResult)
@@ -497,6 +499,32 @@ const Upload = () => {
                 </div>
               </div>
 
+              {/* Full Medical Report (DeepSeek) */}
+              {analysisResult.medicalReport && (
+                <div className="mb-6">
+                  <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
+                    Relatório Médico Completo
+                    {analysisResult.medicalReportBy && (
+                      <span className="ml-2 text-xs text-medical-600 font-normal">
+                        (Gerado por {analysisResult.medicalReportBy})
+                      </span>
+                    )}
+                  </h3>
+                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div
+                      className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{
+                        __html: analysisResult.medicalReport
+                          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                          .replace(/###\s+(.*)/g, '<h3 class="text-lg font-semibold mt-4 mb-2">$1</h3>')
+                          .replace(/##\s+(.*)/g, '<h2 class="text-xl font-bold mt-4 mb-2">$1</h2>')
+                          .replace(/\n/g, '<br/>')
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Recomendações */}
               <div className="mb-6">
                 <h3 className="text-md font-medium text-gray-900 mb-3">Recomendações:</h3>
@@ -510,9 +538,68 @@ const Upload = () => {
                 </ul>
               </div>
 
+              {/* Diagnósticos Diferenciais */}
+              {analysisResult.differentialDiagnoses && analysisResult.differentialDiagnoses.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-md font-medium text-gray-900 mb-3">Diagnósticos Diferenciais:</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {analysisResult.differentialDiagnoses.map((diagnosis, index) => (
+                      <span key={index} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
+                        {diagnosis}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Confidence Scores */}
+              {analysisResult.diagnosis && analysisResult.diagnosis.confidence_scores && (
+                <div className="mb-6">
+                  <h3 className="text-md font-medium text-gray-900 mb-3">Scores de Confiança:</h3>
+                  <div className="space-y-2">
+                    {Object.entries(analysisResult.diagnosis.confidence_scores)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 5)
+                      .map(([condition, score], index) => (
+                        <div key={index} className="flex items-center justify-between">
+                          <span className="text-sm text-gray-700">{condition}</span>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-medical-500"
+                                style={{width: `${score * 100}%`}}
+                              />
+                            </div>
+                            <span className="text-sm font-medium text-gray-900 w-12 text-right">
+                              {(score * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Heatmap Visualization */}
+              {analysisResult.heatmap && (
+                <div className="mb-6">
+                  <h3 className="text-md font-medium text-gray-900 mb-3">Mapa de Calor (Áreas de Atenção):</h3>
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <img
+                      src={analysisResult.heatmap}
+                      alt="Heatmap de diagnóstico"
+                      className="w-full h-auto"
+                    />
+                    <p className="text-xs text-gray-500 p-2 bg-gray-50">
+                      Áreas em vermelho indicam regiões de maior atenção para o diagnóstico
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Fatores de Risco */}
               {analysisResult.riskFactors && analysisResult.riskFactors.length > 0 && (
-                <div>
+                <div className="mb-6">
                   <h3 className="text-md font-medium text-gray-900 mb-3">Fatores de Risco:</h3>
                   <ul className="space-y-2">
                     {analysisResult.riskFactors.map((risk, index) => (

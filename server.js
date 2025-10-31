@@ -1,3 +1,5 @@
+require('dotenv').config()
+
 const express = require('express')
 const cors = require('cors')
 const multer = require('multer')
@@ -17,12 +19,16 @@ app.use(cors())
 app.use(express.json())
 app.use(express.static('dist'))
 
-// Configure multer for file uploads
+// Configure multer for file uploads (Context7 Render optimized)
 const storage = multer.memoryStorage()
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fieldSize: 1024 * 1024, // 1MB for form fields
+    files: 5, // Max 5 files
+    parts: 20, // Max 20 parts (fields + files)
+    headerPairs: 2000 // Max header pairs
   },
   fileFilter: (req, file, cb) => {
     // Accept image files and DICOM
@@ -33,6 +39,25 @@ const upload = multer({
     }
   }
 })
+
+// Helper function to save temporary image
+const saveTempImage = async (imageBuffer) => {
+  const tempPath = path.join(__dirname, `temp_xray_${Date.now()}.jpg`)
+  fs.writeFileSync(tempPath, imageBuffer)
+  return tempPath
+}
+
+// Helper function to clean up temporary file
+const cleanupTempFile = async (tempPath) => {
+  try {
+    if (fs.existsSync(tempPath)) {
+      fs.unlinkSync(tempPath)
+      console.log('🗑️ Arquivo temporário removido')
+    }
+  } catch (error) {
+    console.warn('⚠️ Erro ao remover arquivo temporário:', error.message)
+  }
+}
 
 // Complete Medical AI Analysis with MONAI + MedCLIP + DeepSeek 3.1
 const analyzeXRay = async (imageBuffer, patientInfo, xrayType = 'chest') => {
@@ -61,12 +86,13 @@ const runMedicalAIPipeline = async (imagePath, xrayType, patientInfo) => {
   return new Promise((resolve, reject) => {
     const pythonScript = path.join(__dirname, 'api', 'medical_ai_pipeline.py')
     
-    const pythonProcess = spawn('python', [
+    const pythonExecutable = process.env.PYTHON_PATH || 'python'
+    const pythonProcess = spawn(pythonExecutable, [
       pythonScript,
       imagePath,
       xrayType,
       JSON.stringify(patientInfo)
-    ])
+    ], { env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' } })
 
     let output = ''
     let errorOutput = ''
@@ -504,9 +530,10 @@ app.post('/api/analyze', upload.array('images', 5), async (req, res) => {
       })
     }
 
-    const { patientInfo, symptoms } = req.body
+    const { patientInfo, symptoms, xrayType } = req.body
     const patientData = JSON.parse(patientInfo || '{}')
     const symptomsText = symptoms || ''
+    const xrayTypeValue = (typeof xrayType === 'string' && xrayType.trim().length > 0) ? xrayType.trim() : 'chest'
 
     // Process first image (in real implementation, process all images)
     const imageBuffer = req.files[0].buffer
@@ -526,8 +553,9 @@ app.post('/api/analyze', upload.array('images', 5), async (req, res) => {
       // Continue with original image if processing fails
     }
 
-    // Perform AI analysis
-    const analysisResult = await analyzeXRay(processedImage, patientData, symptomsText)
+    // Perform AI analysis (ensure correct arg order: patientInfo, xrayType)
+    const enrichedPatient = { ...patientData, symptoms: symptomsText }
+    const analysisResult = await analyzeXRay(processedImage, enrichedPatient, xrayTypeValue)
 
     res.json({
       success: true,
@@ -823,11 +851,11 @@ app.post('/api/analyze-xray', upload.single('image'), async (req, res) => {
     let result = ''
     let error = ''
     
-    // Add timeout for Python process (25 seconds - less than Render limit)
+    // Add timeout for Python process (120 seconds for DeepSeek API)
     const timeout = setTimeout(() => {
-      console.log('⏰ DEBUG: Python process timeout - killing process')
+      console.log('⏰ DEBUG: Python process timeout (120s) - killing process')
       pythonProcess.kill()
-    }, 25000)
+    }, 120000)
     
     pythonProcess.stdout.on('data', (data) => {
       const output = data.toString()
@@ -881,13 +909,27 @@ app.post('/api/analyze-xray', upload.single('image'), async (req, res) => {
         console.error('❌ DEBUG: Python stderr:', error)
         console.error('❌ DEBUG: Python stdout:', result)
         
-        // Try to provide fallback analysis
+        // Try to provide fallback analysis (Context7 + Render MCP compatible)
         console.log('🔄 DEBUG: Providing fallback analysis...')
         const fallbackResult = {
           success: true,
           timestamp: new Date().toISOString(),
           xray_type: xrayType,
           patient_info: JSON.parse(patientInfo || '{}'),
+          findings: [
+            'Análise básica de raio-X realizada',
+            'Recomenda-se avaliação médica complementar',
+            'Correlação com sintomas clínicos necessária'
+          ],
+          recommendations: [
+            'Correlação com sintomas clínicos',
+            'Avaliação médica complementar',
+            'Exames adicionais se necessário'
+          ],
+          riskFactors: ['Fatores de risco não identificados'],
+          confidence: 0.6,
+          aiProvider: 'Fallback System',
+          framework: 'Fallback Analysis',
           diagnosis: {
             primary_diagnosis: 'Análise Básica',
             confidence_scores: { 'Normal': 0.6, 'Abnormal': 0.4 },
